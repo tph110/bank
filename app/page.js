@@ -9,10 +9,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans text-gray-800">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-blue-700 mb-2">🏦 Chase Analyser</h1>
-          <p className="text-gray-500">Secure, client-side bank statement processing</p>
+        
+        {/* 🟢 NEW HEADER START */}
+        <header className="mb-8 text-center flex flex-col items-center">
+          {/* Make sure the filename matches what you put in the public folder */}
+          <img 
+            src="/logo.png" 
+            alt="Only Banks Logo" 
+            className="w-64 h-auto mb-4" 
+          />
+          <p className="text-gray-500">Upload your bank statements → Get smart spend insights.</p>
         </header>
+        {/* 🟢 NEW HEADER END */}
 
         {transactions.length === 0 ? (
           <FileUploader onDataLoaded={setTransactions} />
