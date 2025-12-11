@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-const data = parseStatement(fullText); // Was parseChaseStatement(fullText)
+// 🟢 FIX 1: Import the new generic function name
+import { parseStatement } from '@/utils/moneyHelper';
 
 export default function FileUploader({ onDataLoaded }) {
   const [loading, setLoading] = useState(false);
@@ -11,10 +12,8 @@ export default function FileUploader({ onDataLoaded }) {
 
     setLoading(true);
     try {
-      // 🟢 CHANGE: We import the library ONLY when the function runs
+      // Lazy load PDF parser (prevents build errors)
       const pdfjsLib = await import('pdfjs-dist');
-      
-      // Set the worker source dynamically
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
       const arrayBuffer = await file.arrayBuffer();
@@ -27,7 +26,8 @@ export default function FileUploader({ onDataLoaded }) {
         fullText += textContent.items.map(item => item.str).join(' ') + ' ';
       }
 
-      const data = parseChaseStatement(fullText);
+      // 🟢 FIX 2: Call the new generic function
+      const data = parseStatement(fullText);
       onDataLoaded(data);
     } catch (err) {
       console.error(err);
@@ -39,8 +39,8 @@ export default function FileUploader({ onDataLoaded }) {
 
   return (
     <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:bg-gray-50 transition">
-      <p className="text-xl font-semibold text-blue-600 mb-2">Upload Chase Statement</p>
-      <p className="text-sm text-gray-500 mb-4">Select your .pdf file to begin analysis</p>
+      <p className="text-xl font-semibold text-blue-600 mb-2">Upload Bank Statement</p>
+      <p className="text-sm text-gray-500 mb-4">Supports Chase & Monzo PDFs</p>
       
       {loading ? (
         <p className="text-blue-500 animate-pulse">Processing... please wait</p>
