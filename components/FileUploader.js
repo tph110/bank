@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { parseChaseStatement } from '@/utils/moneyHelper';
+const data = parseStatement(fullText); // Was parseChaseStatement(fullText)
 
 export default function FileUploader({ onDataLoaded }) {
   const [loading, setLoading] = useState(false);
