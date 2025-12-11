@@ -10,7 +10,7 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans text-gray-800">
       <div className="max-w-4xl mx-auto">
         
-        {/* 🟢 NEW LOGO HEADER */}
+        {/* 🟢 NEW HEADER: Logo & Subtitle */}
         <header className="mb-8 text-center flex flex-col items-center">
           <img 
             src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo.png" 
@@ -19,10 +19,9 @@ export default function Home() {
           />
           <p className="text-gray-500 text-lg">Upload your bank statements → Get smart spend insights.</p>
         </header>
-        {/* 🟢 END HEADER */}
 
+        {/* 🟢 CONDITIONAL: Show Uploader OR Dashboard */}
         {transactions.length === 0 ? (
-  
           <FileUploader onDataLoaded={setTransactions} />
         ) : (
           <div>
