@@ -10,19 +10,19 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans text-gray-800">
       <div className="max-w-4xl mx-auto">
         
-        {/* 🟢 NEW HEADER START */}
+        {/* 🟢 NEW LOGO HEADER */}
         <header className="mb-8 text-center flex flex-col items-center">
-          {/* Make sure the filename matches what you put in the public folder */}
           <img 
-            src="/logo.png" 
+            src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo.png" 
             alt="Only Banks Logo" 
-            className="w-64 h-auto mb-4" 
+            className="w-full max-w-xs h-auto mb-4 drop-shadow-sm" 
           />
-          <p className="text-gray-500">Upload your bank statements → Get smart spend insights.</p>
+          <p className="text-gray-500 text-lg">Upload your bank statements → Get smart spend insights.</p>
         </header>
-        {/* 🟢 NEW HEADER END */}
+        {/* 🟢 END HEADER */}
 
         {transactions.length === 0 ? (
+  
           <FileUploader onDataLoaded={setTransactions} />
         ) : (
           <div>
