@@ -1,10 +1,6 @@
-'use client'; // Required for browser features like file inputs
+'use client';
 import { useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
 import { parseChaseStatement } from '@/utils/moneyHelper';
-
-// Point to the worker file on a CDN to avoid complex Webpack config
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export default function FileUploader({ onDataLoaded }) {
   const [loading, setLoading] = useState(false);
@@ -15,6 +11,12 @@ export default function FileUploader({ onDataLoaded }) {
 
     setLoading(true);
     try {
+      // 🟢 CHANGE: We import the library ONLY when the function runs
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set the worker source dynamically
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
@@ -26,7 +28,7 @@ export default function FileUploader({ onDataLoaded }) {
       }
 
       const data = parseChaseStatement(fullText);
-      onDataLoaded(data); // Send data up to the parent
+      onDataLoaded(data);
     } catch (err) {
       console.error(err);
       alert("Failed to parse PDF");
