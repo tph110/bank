@@ -57,37 +57,50 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (FIXED)
+// ✅ 3. PARSER FOR SANTANDER (FIXED & IMPROVED)
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  // Regex: 27th Oct ... Description ... Amount ... Balance
+  // Regex: 27th Oct ... Description ... Amount
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*?)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-  
-  // ✅ TYPO FIXED HERE: newDUate() -> new Date()
-  const currentYear = new Date().getFullYear(); 
+  const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
-    // Skip headers/footers
-    if (line.includes('Balance brought forward') || line.includes('Start Balance')) continue;
+    // 🚫 SKIP HEADERS, FOOTERS, AND INTEREST RATE LINES
+    if (line.includes('Balance brought forward') || 
+        line.includes('Start Balance') ||
+        line.includes('Credit interest rate') || 
+        line.includes('AER') || 
+        line.includes('Average balance') ||
+        line.includes('balance at close')) continue;
 
     const match = line.match(regex);
     if (match) {
       const [_, day, monthAbbr, desc, amountStr] = match;
       
-      // Determine Type (Expense vs Income) based on keywords
-      const description = desc.trim().toUpperCase();
-      let isIncome = description.includes('RECEIPT') || description.includes('REFUND') || description.includes('INTEREST PAID');
+      const description = desc.trim();
+      const upperDesc = description.toUpperCase();
+      
+      // ✅ IMPROVED INCOME DETECTION
+      // "transfer" (lowercase) often implies money in for Santander, while "BILL PAYMENT" is money out.
+      let isIncome = 
+        upperDesc.includes('RECEIPT') || 
+        upperDesc.includes('REFUND') || 
+        upperDesc.includes('INTEREST PAID') ||
+        upperDesc.includes('CASHBACK') || 
+        description === 'transfer' || // Exact match for the £8,240 deposit
+        upperDesc.includes('PAYMENT FROM') ||
+        upperDesc.includes('DEPOSIT');
       
       // Amount cleaning
       let amount = parseFloat(amountStr.replace(/,/g, ''));
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        // Uses current year (2025/2026) since statement line doesn't have it
+        // Uses current year since statement doesn't strictly provide it on the transaction line
         date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
-        description: desc.trim(),
+        description: description,
         amount: Math.abs(amount),
         type: isIncome ? 'income' : 'expense',
       });
@@ -129,7 +142,6 @@ export const parseStatement = (rawText, pageCount) => {
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
   // Pre-process: Add newlines before dates to ensure splitting works
-  // Handles "01 Jan 2023" (Chase) AND "01st Jan" (Santander)
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
@@ -183,7 +195,7 @@ export const categoriseTransaction = (description) => {
     { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor'], category: 'Health & Personal' },
     { keywords: ['netflix', 'spotify', 'disney', 'prime', 'apple', 'klarna', 'hbo', 'youtube'], category: 'Subscriptions' },
     { keywords: ['chase saver', 'rewards', 'transfer', 'savings', 'invest', 'trading 212'], category: 'Transfers' },
-    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund'], category: 'Income' },
+    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund', 'cashback'], category: 'Income' },
   ];
 
   for (const rule of rules) {
@@ -199,7 +211,6 @@ export const generateInsights = (transactions) => {
 
   const insights = [];
   
-  // Example insights
   const coffee = expenses.filter(t => t.category === 'Eating out' && /coffee|cafe|pret|costa|starbucks/i.test(t.description)).reduce((s, t) => s + t.amount, 0);
   if (coffee > 20) insights.push(`☕ You spent £${coffee.toFixed(2)} on coffee this month.`);
 
