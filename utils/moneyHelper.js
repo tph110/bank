@@ -57,20 +57,22 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (FINAL FIX)
+// ✅ 3. PARSER FOR SANTANDER (STRICT FIX)
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  // Regex: 27th Oct ... Description ... Amount
-  // Changed (.*?) to (.*) to be "Greedy" -> Finds the LAST amount in the line (Fixes the 0.00 tax issue)
-  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
+  
+  // Regex Explanation:
+  // 1. Date: (\d{1,2}...)
+  // 2. Desc: (.*) -> Everything in between
+  // 3. Amount: ((?:\d{1,3},)*\d{1,3}\.\d{2}) -> The transaction amount
+  // 4. Balance: [+-]?((?:\d{1,3},)*\d{1,3}\.\d{2}) -> The running balance at the end (Ignored)
+  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-  
-  // Use current year as fallback since lines usually lack year
   const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
-    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES (Fixes phantom expenses)
+    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES
     if (line.includes('Balance brought forward') || 
         line.includes('Balance carried forward') || 
         line.includes('Start Balance') ||
@@ -81,18 +83,18 @@ const parseSantanderStatement = (lines) => {
 
     const match = line.match(regex);
     if (match) {
+      // match[3] is the Amount, match[4] is the Balance (which we ignore)
       const [_, day, monthAbbr, desc, amountStr] = match;
       
       const description = desc.trim();
       const upperDesc = description.toUpperCase();
       
-      // ✅ IMPROVED INCOME DETECTION
       let isIncome = 
         upperDesc.includes('RECEIPT') || 
         upperDesc.includes('REFUND') || 
         upperDesc.includes('INTEREST PAID') ||
         upperDesc.includes('CASHBACK') || 
-        description === 'transfer' || // "transfer" is usually money in for Santander
+        description === 'transfer' || 
         upperDesc.includes('PAYMENT FROM') ||
         upperDesc.includes('DEPOSIT');
       
@@ -143,7 +145,6 @@ export const parseStatement = (rawText, pageCount) => {
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
   // Pre-process: Add newlines before dates to ensure splitting works
-  // Handles "01 Jan 2023" (Chase) AND "01st Jan" (Santander)
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
