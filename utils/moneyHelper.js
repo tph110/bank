@@ -135,6 +135,276 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
+// ✅ 3. PARSER FOR STARLING BANK
+const parseStarlingStatement = (lines) => {
+  const transactions = [];
+  // Starling format: DD/MM/YYYY Description £Amount
+  const regex = /(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([+-]?£[\d,]+\.\d{2})/;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const line of lines) {
+    if (line.includes('Date') || line.includes('Balance')) continue;
+
+    const match = line.match(regex);
+    if (!match) {
+      failCount++;
+      continue;
+    }
+
+    try {
+      const [_, dateStr, desc, amountStr] = match;
+      
+      // Convert DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = dateStr.split('/');
+      const date = `${year}-${month}-${day}`;
+
+      const cleanAmount = parseFloat(
+        amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim()
+      );
+
+      if (isNaN(cleanAmount) || cleanAmount === 0) {
+        failCount++;
+        continue;
+      }
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        date: date,
+        description: desc.trim(),
+        amount: Math.abs(cleanAmount),
+        type: cleanAmount < 0 ? 'expense' : 'income',
+      });
+      successCount++;
+    } catch (error) {
+      console.error('Error parsing line:', line, error);
+      failCount++;
+    }
+  }
+
+  console.log(`Starling parsing: ${successCount} successful, ${failCount} failed`);
+  return transactions;
+};
+
+// ✅ 4. PARSER FOR BARCLAYS
+const parseBarclaysStatement = (lines) => {
+  const transactions = [];
+  // Barclays format: DD Mon YYYY Description Amount
+  const regex = /(\d{2})\s+([A-Za-z]{3})\s+(\d{4})\s+(.+?)\s+([+-]?[\d,]+\.\d{2})/;
+  const monthMap = { 
+    Jan: '01', Feb: '02', Mar: '03', Apr: '04', 
+    May: '05', Jun: '06', Jul: '07', Aug: '08', 
+    Sep: '09', Oct: '10', Nov: '11', Dec: '12' 
+  };
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const line of lines) {
+    if (line.includes('Statement') || line.includes('Balance')) continue;
+
+    const match = line.match(regex);
+    if (!match) {
+      failCount++;
+      continue;
+    }
+
+    try {
+      const [_, day, monthAbbr, year, desc, amountStr] = match;
+
+      if (!monthMap[monthAbbr]) {
+        failCount++;
+        continue;
+      }
+
+      const date = `${year}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`;
+      const cleanAmount = parseFloat(
+        amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim()
+      );
+
+      if (isNaN(cleanAmount) || cleanAmount === 0) {
+        failCount++;
+        continue;
+      }
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        date: date,
+        description: desc.trim(),
+        amount: Math.abs(cleanAmount),
+        type: cleanAmount < 0 ? 'expense' : 'income',
+      });
+      successCount++;
+    } catch (error) {
+      console.error('Error parsing line:', line, error);
+      failCount++;
+    }
+  }
+
+  console.log(`Barclays parsing: ${successCount} successful, ${failCount} failed`);
+  return transactions;
+};
+
+// ✅ 5. PARSER FOR SANTANDER
+const parseSantanderStatement = (lines) => {
+  const transactions = [];
+  // Santander format: DD/MM/YYYY Description Debit/Credit Amount
+  const regex = /(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+(Debit|Credit|DR|CR)\s+([+-]?[\d,]+\.\d{2})/;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const line of lines) {
+    if (line.includes('Date') || line.includes('Balance')) continue;
+
+    const match = line.match(regex);
+    if (!match) {
+      failCount++;
+      continue;
+    }
+
+    try {
+      const [_, dateStr, desc, type, amountStr] = match;
+      
+      // Convert DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = dateStr.split('/');
+      const date = `${year}-${month}-${day}`;
+
+      const cleanAmount = parseFloat(amountStr.replace(/[£,]/g, '').trim());
+
+      if (isNaN(cleanAmount) || cleanAmount === 0) {
+        failCount++;
+        continue;
+      }
+
+      // Santander uses Debit/Credit or DR/CR
+      const isExpense = type === 'Debit' || type === 'DR';
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        date: date,
+        description: desc.trim(),
+        amount: Math.abs(cleanAmount),
+        type: isExpense ? 'expense' : 'income',
+      });
+      successCount++;
+    } catch (error) {
+      console.error('Error parsing line:', line, error);
+      failCount++;
+    }
+  }
+
+  console.log(`Santander parsing: ${successCount} successful, ${failCount} failed`);
+  return transactions;
+};
+
+// ✅ 6. PARSER FOR LLOYDS
+const parseLloydsStatement = (lines) => {
+  const transactions = [];
+  // Lloyds format: DD/MM/YYYY Description Amount (with separate debit/credit columns)
+  const regex = /(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([+-]?[\d,]+\.\d{2})/;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const line of lines) {
+    if (line.includes('Transaction Date') || line.includes('Balance')) continue;
+
+    const match = line.match(regex);
+    if (!match) {
+      failCount++;
+      continue;
+    }
+
+    try {
+      const [_, dateStr, desc, amountStr] = match;
+      
+      // Convert DD/MM/YYYY to YYYY-MM-DD
+      const [day, month, year] = dateStr.split('/');
+      const date = `${year}-${month}-${day}`;
+
+      const cleanAmount = parseFloat(
+        amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim()
+      );
+
+      if (isNaN(cleanAmount) || cleanAmount === 0) {
+        failCount++;
+        continue;
+      }
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        date: date,
+        description: desc.trim(),
+        amount: Math.abs(cleanAmount),
+        type: cleanAmount < 0 ? 'expense' : 'income',
+      });
+      successCount++;
+    } catch (error) {
+      console.error('Error parsing line:', line, error);
+      failCount++;
+    }
+  }
+
+  console.log(`Lloyds parsing: ${successCount} successful, ${failCount} failed`);
+  return transactions;
+};
+
+// ✅ 7. PARSER FOR REVOLUT
+const parseRevolutStatement = (lines) => {
+  const transactions = [];
+  // Revolut CSV-like format: Date, Description, Amount
+  const regex = /(\d{4}-\d{2}-\d{2})\s+(.+?)\s+([+-]?[\d,]+\.\d{2})\s*(GBP|EUR|USD)?/;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const line of lines) {
+    if (line.includes('Started Date') || line.includes('Completed Date')) continue;
+
+    const match = line.match(regex);
+    if (!match) {
+      failCount++;
+      continue;
+    }
+
+    try {
+      const [_, date, desc, amountStr, currency] = match;
+
+      // Skip non-GBP transactions if needed
+      if (currency && currency !== 'GBP') {
+        failCount++;
+        continue;
+      }
+
+      const cleanAmount = parseFloat(
+        amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim()
+      );
+
+      if (isNaN(cleanAmount) || cleanAmount === 0) {
+        failCount++;
+        continue;
+      }
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        date: date,
+        description: desc.trim(),
+        amount: Math.abs(cleanAmount),
+        type: cleanAmount < 0 ? 'expense' : 'income',
+      });
+      successCount++;
+    } catch (error) {
+      console.error('Error parsing line:', line, error);
+      failCount++;
+    }
+  }
+
+  console.log(`Revolut parsing: ${successCount} successful, ${failCount} failed`);
+  return transactions;
+};
+
 // ✅ 3. IMPROVED MAIN CONTROLLER
 export const parseStatement = (rawText, pageCount) => {
   // Validate page count
