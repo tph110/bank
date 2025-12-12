@@ -57,22 +57,17 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (STRICT FIX)
+// ✅ 3. PARSER FOR SANTANDER
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  
-  // Regex Explanation:
-  // 1. Date: (\d{1,2}...)
-  // 2. Desc: (.*) -> Everything in between
-  // 3. Amount: ((?:\d{1,3},)*\d{1,3}\.\d{2}) -> The transaction amount
-  // 4. Balance: [+-]?((?:\d{1,3},)*\d{1,3}\.\d{2}) -> The running balance at the end (Ignored)
-  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
+  // Regex: 27th Oct ... Description ... Amount ... Balance
+  // Greedy match (.*) ensures we grab the LAST amount as the balance is usually at the end
+  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
-    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES
     if (line.includes('Balance brought forward') || 
         line.includes('Balance carried forward') || 
         line.includes('Start Balance') ||
@@ -83,7 +78,6 @@ const parseSantanderStatement = (lines) => {
 
     const match = line.match(regex);
     if (match) {
-      // match[3] is the Amount, match[4] is the Balance (which we ignore)
       const [_, day, monthAbbr, desc, amountStr] = match;
       
       const description = desc.trim();
@@ -112,7 +106,49 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR LLOYDS / HALIFAX
+// ✅ 4. PARSER FOR BARCLAYS (NEW)
+const parseBarclaysStatement = (lines) => {
+  const transactions = [];
+  // Regex: Date (3 Nov) ... Description ... Amount ... Balance
+  // We capture two amounts at the end; the first is the Transaction, the second is the Balance.
+  const regex = /(\d{1,2}\s[A-Za-z]{3})\s+(.*)\s+((?:\d{1,3}[,.]?)*\d{1,3}\.\d{2})\s+((?:\d{1,3}[,.]?)*\d{1,3}\.\d{2})/;
+  
+  const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+  const currentYear = new Date().getFullYear();
+
+  for (const line of lines) {
+    if (line.includes('Start Balance') || line.includes('End balance')) continue;
+
+    const match = line.match(regex);
+    if (match) {
+      const [_, dateStr, desc, amountStr, balanceStr] = match;
+      
+      const [day, monthAbbr] = dateStr.split(' ');
+      const description = desc.trim();
+      const upperDesc = description.toUpperCase();
+
+      // Barclays Description logic for Income vs Expense
+      let isIncome = 
+        upperDesc.includes('DIRECT CREDIT') || 
+        upperDesc.includes('DEPOSIT') ||
+        upperDesc.includes('CREDIT FROM');
+
+      // Clean amount (Barclays sometimes uses dots/commas differently)
+      let amount = parseFloat(amountStr.replace(/[,]/g, ''));
+
+      transactions.push({
+        id: Math.random().toString(36).substr(2, 9),
+        date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
+        description: description,
+        amount: Math.abs(amount),
+        type: isIncome ? 'income' : 'expense',
+      });
+    }
+  }
+  return transactions;
+};
+
+// ✅ 5. PARSER FOR LLOYDS / HALIFAX
 const parseLloydsStatement = (lines) => {
   const transactions = [];
   const regex = /(\d{2}\s[A-Za-z]{3}\s\d{2})\s+(.+?)\s+([+-]?£?[\d,]+\.\d{2})/;
@@ -139,7 +175,7 @@ const parseLloydsStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 5. MASTER PARSER
+// ✅ 6. MASTER PARSER
 export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
@@ -167,12 +203,16 @@ export const parseStatement = (rawText, pageCount) => {
     data = parseMonzoStatement(lines);
     bankType = 'Monzo';
   }
+  else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { // ✅ Added Barclays check
+    data = parseBarclaysStatement(lines);
+    bankType = 'Barclays';
+  }
   else if (rawText.includes('Lloyds') || rawText.includes('Halifax')) {
     data = parseLloydsStatement(lines);
     bankType = 'Lloyds/Halifax';
   }
   else {
-    throw new Error('Bank not recognised. Currently supporting: Chase, Monzo, Santander, Lloyds.');
+    throw new Error('Bank not recognised. Currently supporting: Chase, Monzo, Santander, Barclays, Lloyds.');
   }
 
   if (data.length === 0) {
@@ -187,7 +227,7 @@ export const parseStatement = (rawText, pageCount) => {
   }));
 };
 
-// ✅ 6. CATEGORISATION
+// ✅ 7. CATEGORISATION
 export const categoriseTransaction = (description) => {
   const desc = description.toLowerCase().trim();
   const rules = [
@@ -195,10 +235,10 @@ export const categoriseTransaction = (description) => {
     { keywords: ['pret', 'costa', 'starbucks', 'greggs', 'mcdonald', 'burger king', 'nando', 'deliveroo', 'just eat', 'uber eats', 'cafe', 'coffee', 'kfc', 'subway'], category: 'Eating out' },
     { keywords: ['amazon', 'argos', 'boots', 'superdrug', 'whsmith', 'next', 'zara', 'asos', 'temu', 'shein', 'ikea', 'primark'], category: 'Shopping' },
     { keywords: ['petrol', 'fuel', 'shell', 'bp', 'trainline', 'tfl', 'uber', 'bolt', 'taxi', 'bus', 'transport', 'parking'], category: 'Transport' },
-    { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor'], category: 'Health & Personal' },
+    { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor', 'medical'], category: 'Health & Personal' },
     { keywords: ['netflix', 'spotify', 'disney', 'prime', 'apple', 'klarna', 'hbo', 'youtube'], category: 'Subscriptions' },
     { keywords: ['chase saver', 'rewards', 'transfer', 'savings', 'invest', 'trading 212'], category: 'Transfers' },
-    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund', 'cashback'], category: 'Income' },
+    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund', 'cashback', 'credit from'], category: 'Income' },
   ];
 
   for (const rule of rules) {
@@ -207,7 +247,7 @@ export const categoriseTransaction = (description) => {
   return 'Other';
 };
 
-// ✅ 7. INSIGHTS
+// ✅ 8. INSIGHTS
 export const generateInsights = (transactions) => {
   const expenses = transactions.filter(t => t.type === 'expense');
   if (expenses.length === 0) return ['No expenses found in this period.'];
