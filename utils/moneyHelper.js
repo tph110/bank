@@ -57,18 +57,22 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (FIXED & IMPROVED)
+// ✅ 3. PARSER FOR SANTANDER (FINAL FIX)
 const parseSantanderStatement = (lines) => {
   const transactions = [];
   // Regex: 27th Oct ... Description ... Amount
-  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*?)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
+  // Changed (.*?) to (.*) to be "Greedy" -> Finds the LAST amount in the line (Fixes the 0.00 tax issue)
+  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+  
+  // Use current year as fallback since lines usually lack year
   const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
-    // 🚫 SKIP HEADERS, FOOTERS, AND INTEREST RATE LINES
+    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES (Fixes phantom expenses)
     if (line.includes('Balance brought forward') || 
+        line.includes('Balance carried forward') || 
         line.includes('Start Balance') ||
         line.includes('Credit interest rate') || 
         line.includes('AER') || 
@@ -83,22 +87,19 @@ const parseSantanderStatement = (lines) => {
       const upperDesc = description.toUpperCase();
       
       // ✅ IMPROVED INCOME DETECTION
-      // "transfer" (lowercase) often implies money in for Santander, while "BILL PAYMENT" is money out.
       let isIncome = 
         upperDesc.includes('RECEIPT') || 
         upperDesc.includes('REFUND') || 
         upperDesc.includes('INTEREST PAID') ||
         upperDesc.includes('CASHBACK') || 
-        description === 'transfer' || // Exact match for the £8,240 deposit
+        description === 'transfer' || // "transfer" is usually money in for Santander
         upperDesc.includes('PAYMENT FROM') ||
         upperDesc.includes('DEPOSIT');
       
-      // Amount cleaning
       let amount = parseFloat(amountStr.replace(/,/g, ''));
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        // Uses current year since statement doesn't strictly provide it on the transaction line
         date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
         description: description,
         amount: Math.abs(amount),
@@ -142,6 +143,7 @@ export const parseStatement = (rawText, pageCount) => {
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
   // Pre-process: Add newlines before dates to ensure splitting works
+  // Handles "01 Jan 2023" (Chase) AND "01st Jan" (Santander)
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
