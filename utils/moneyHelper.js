@@ -60,10 +60,7 @@ const parseMonzoStatement = (lines) => {
 // ✅ 3. PARSER FOR SANTANDER
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  // Regex: 27th Oct ... Description ... Amount ... Balance
-  // Greedy match (.*) ensures we grab the LAST amount as the balance is usually at the end
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
-  
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
@@ -79,7 +76,6 @@ const parseSantanderStatement = (lines) => {
     const match = line.match(regex);
     if (match) {
       const [_, day, monthAbbr, desc, amountStr] = match;
-      
       const description = desc.trim();
       const upperDesc = description.toUpperCase();
       
@@ -106,45 +102,74 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (NEW)
-const parseBarclaysStatement = (lines) => {
+// ✅ 4. PARSER FOR BARCLAYS (NEW & ROBUST)
+const parseBarclaysStatement = (rawText) => {
   const transactions = [];
-  // Regex: Date (3 Nov) ... Description ... Amount ... Balance
-  // We capture two amounts at the end; the first is the Transaction, the second is the Balance.
-  const regex = /(\d{1,2}\s[A-Za-z]{3})\s+(.*)\s+((?:\d{1,3}[,.]?)*\d{1,3}\.\d{2})\s+((?:\d{1,3}[,.]?)*\d{1,3}\.\d{2})/;
-  
-  const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
+  const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
 
-  for (const line of lines) {
-    if (line.includes('Start Balance') || line.includes('End balance')) continue;
-
-    const match = line.match(regex);
-    if (match) {
-      const [_, dateStr, desc, amountStr, balanceStr] = match;
-      
-      const [day, monthAbbr] = dateStr.split(' ');
-      const description = desc.trim();
-      const upperDesc = description.toUpperCase();
-
-      // Barclays Description logic for Income vs Expense
-      let isIncome = 
-        upperDesc.includes('DIRECT CREDIT') || 
-        upperDesc.includes('DEPOSIT') ||
-        upperDesc.includes('CREDIT FROM');
-
-      // Clean amount (Barclays sometimes uses dots/commas differently)
-      let amount = parseFloat(amountStr.replace(/[,]/g, ''));
-
-      transactions.push({
-        id: Math.random().toString(36).substr(2, 9),
-        date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
-        description: description,
-        amount: Math.abs(amount),
-        type: isIncome ? 'income' : 'expense',
-      });
-    }
+  // 1. Find the "Start Balance" to help us calculate Income vs Expense mathematically
+  let lastBalance = 0;
+  const startBalanceMatch = rawText.match(/Start Balance\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/);
+  if (startBalanceMatch) {
+    lastBalance = parseFloat(startBalanceMatch[1].replace(/,/g, ''));
+  } else {
+    // Try "Balance brought forward" if Start Balance missing
+    const bbfMatch = rawText.match(/Balance brought forward.*?\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/);
+    if (bbfMatch) lastBalance = parseFloat(bbfMatch[1].replace(/,/g, ''));
   }
+
+  // 2. Main Regex: Captures Date (optional), Description, Amount, Running Balance
+  const regex = /(\d{1,2}\s[A-Za-z]{3})?\s+(.*?)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/g;
+  
+  let match;
+  let lastDate = `${currentYear}-01-01`; // Fallback
+
+  while ((match = regex.exec(rawText)) !== null) {
+    const [_, dateStr, desc, amountStr, balanceStr] = match;
+    const description = desc.trim();
+
+    // Skip summary lines
+    if (description.includes('Start Balance') || 
+        description.includes('Balance brought forward') || 
+        description.includes('Total Payments') ||
+        description.includes('Balance carried forward')) continue;
+
+    // Handle Date (Barclays lists date only once per day)
+    if (dateStr) {
+      const [day, monthAbbr] = dateStr.split(' ');
+      lastDate = `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`;
+    }
+
+    const amount = parseFloat(amountStr.replace(/,/g, ''));
+    const balance = parseFloat(balanceStr.replace(/,/g, ''));
+
+    // 3. MATHEMATICAL CHECK: Income or Expense?
+    // If Balance INCREASED, it's Income. If DECREASED, it's Expense.
+    let isIncome = false;
+    const diff = balance - lastBalance;
+    
+    // Check if the difference matches the transaction amount (approximate for float errors)
+    if (Math.abs(Math.abs(diff) - amount) < 0.05) {
+      isIncome = diff > 0;
+    } else {
+      // Fallback to keywords if math fails (e.g. first transaction gap)
+      const upperDesc = description.toUpperCase();
+      isIncome = upperDesc.includes('CREDIT') || upperDesc.includes('DEPOSIT') || upperDesc.includes('RECEIPT');
+    }
+
+    // Update tracking balance
+    lastBalance = balance;
+
+    transactions.push({
+      id: Math.random().toString(36).substr(2, 9),
+      date: lastDate,
+      description: description,
+      amount: Math.abs(amount),
+      type: isIncome ? 'income' : 'expense',
+    });
+  }
+
   return transactions;
 };
 
@@ -180,7 +205,6 @@ export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
-  // Pre-process: Add newlines before dates to ensure splitting works
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
@@ -190,7 +214,6 @@ export const parseStatement = (rawText, pageCount) => {
   let data = [];
   let bankType = '';
 
-  // 🔍 Improved Detection Logic
   if (rawText.includes('Santander') && rawText.includes('Sort Code')) {
     data = parseSantanderStatement(lines);
     bankType = 'Santander';
@@ -203,8 +226,9 @@ export const parseStatement = (rawText, pageCount) => {
     data = parseMonzoStatement(lines);
     bankType = 'Monzo';
   }
-  else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { // ✅ Added Barclays check
-    data = parseBarclaysStatement(lines);
+  else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { 
+    // Pass RAW text for Barclays to handle multi-line regex better
+    data = parseBarclaysStatement(rawText.replace(/\s+/g, ' '));
     bankType = 'Barclays';
   }
   else if (rawText.includes('Lloyds') || rawText.includes('Halifax')) {
@@ -216,7 +240,7 @@ export const parseStatement = (rawText, pageCount) => {
   }
 
   if (data.length === 0) {
-    throw new Error(`No transactions found in ${bankType} statement. Please check the file format.`);
+    throw new Error(`No transactions found in ${bankType} statement.`);
   }
 
   console.log(`Parsed ${data.length} transactions from ${bankType}`);
