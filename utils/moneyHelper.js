@@ -1,4 +1,4 @@
-// utils/moneyHelper.js
+// src/utils/moneyHelper.js
 
 // Constants
 const AVG_UK_COFFEE_SPEND = 28.50;
@@ -61,13 +61,12 @@ const parseMonzoStatement = (lines) => {
 const parseSantanderStatement = (lines) => {
   const transactions = [];
   // Regex: 27th Oct ... Description ... Amount ... Balance
-  // Matches: "27th Oct" or "27 Oct"
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*?)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   
-  // Try to find the year from the file (default to current year if not found)
-  const currentYear = newDUate().getFullYear();
+  // ✅ TYPO FIXED HERE: newDUate() -> new Date()
+  const currentYear = new Date().getFullYear(); 
 
   for (const line of lines) {
     // Skip headers/footers
@@ -86,8 +85,8 @@ const parseSantanderStatement = (lines) => {
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        // Santander doesn't provide year in line, assuming 2025 based on your PDF header
-        date: `2025-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
+        // Uses current year (2025/2026) since statement line doesn't have it
+        date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
         description: desc.trim(),
         amount: Math.abs(amount),
         type: isIncome ? 'income' : 'expense',
@@ -124,7 +123,7 @@ const parseLloydsStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 5. MASTER PARSER (UPDATED)
+// ✅ 5. MASTER PARSER
 export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
@@ -173,7 +172,7 @@ export const parseStatement = (rawText, pageCount) => {
   }));
 };
 
-// ✅ 6. CATEGORISATION (Keep your existing one)
+// ✅ 6. CATEGORISATION
 export const categoriseTransaction = (description) => {
   const desc = description.toLowerCase().trim();
   const rules = [
@@ -193,7 +192,7 @@ export const categoriseTransaction = (description) => {
   return 'Other';
 };
 
-// ✅ 7. INSIGHTS (Keep your existing one)
+// ✅ 7. INSIGHTS
 export const generateInsights = (transactions) => {
   const expenses = transactions.filter(t => t.type === 'expense');
   if (expenses.length === 0) return ['No expenses found in this period.'];
