@@ -4,8 +4,8 @@ import { useDropzone } from 'react-dropzone';
 import * as pdfjsLib from 'pdfjs-dist';
 import { parseStatement } from '../utils/moneyHelper';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// ✅ FIX: Hardcode version 3.11.174 to prevent 404 errors
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export default function FileUploader({ onDataParsed }) {
   const [loading, setLoading] = useState(false);
@@ -29,26 +29,29 @@ export default function FileUploader({ onDataParsed }) {
 
     setAiStatus(`🤖 AI is categorising ${unknown.length} remaining items...`);
 
-    const updatedTransactions = [...initialData];
-    
-    // Process in batches of 5 to avoid overwhelming the free API
+    let currentData = [...initialData];
+
+    // Process in batches of 5
     const batchSize = 5;
     for (let i = 0; i < unknown.length; i += batchSize) {
       const batch = unknown.slice(i, i + batchSize);
       
       await Promise.all(batch.map(async (t) => {
         try {
+          // ✅ FIX 4: Added Content-Type header so the server knows it's JSON
           const res = await fetch('/api/categorise', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify({ description: t.description }),
           });
           
           if (res.ok) {
             const data = await res.json();
-            // Update the transaction in the main list
-            const index = updatedTransactions.findIndex(ut => ut.id === t.id);
+            const index = currentData.findIndex(ut => ut.id === t.id);
             if (index !== -1 && data.category && data.category !== 'Other') {
-              updatedTransactions[index].category = data.category;
+              currentData[index] = { ...currentData[index], category: data.category };
             }
           }
         } catch (err) {
@@ -56,15 +59,15 @@ export default function FileUploader({ onDataParsed }) {
         }
       }));
 
-      // Update UI incrementally after each batch
-      onDataParsed([...updatedTransactions]);
+      onDataParsed([...currentData]);
     }
 
     setAiStatus('✅ AI Categorisation Complete');
     setTimeout(() => setAiStatus(''), 3000);
   };
 
-  const handleFileChange = async (acceptedFiles) => {
+  // ✅ FIX 3: Logic inside useCallback with correct dependencies
+  const onDrop = useCallback(async (acceptedFiles) => {
     setLoading(true);
     setError(null);
     setAiStatus('');
@@ -85,9 +88,9 @@ export default function FileUploader({ onDataParsed }) {
         fullText += textContent.items.map(item => item.str).join(' ') + '\n';
       }
 
-      // 1. Instant Parse (Local Rules)
+      // 1. Instant Parse
       const data = parseStatement(fullText, pdf.numPages, customRules);
-      onDataParsed(data); // Show results immediately
+      onDataParsed(data); 
 
       setLoading(false);
 
@@ -99,9 +102,8 @@ export default function FileUploader({ onDataParsed }) {
       setError(err.message || "Failed to parse bank statement");
       setLoading(false);
     }
-  };
+  }, [customRules, onDataParsed]); // ✅ Added onDataParsed to dependencies
 
-  const onDrop = useCallback(handleFileChange, [customRules]);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop, 
     accept: { 'application/pdf': ['.pdf'] },
@@ -134,7 +136,6 @@ export default function FileUploader({ onDataParsed }) {
         )}
       </div>
 
-      {/* AI Status Indicator */}
       {aiStatus && (
         <div className="mt-4 p-3 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg flex items-center justify-center animate-pulse">
           {aiStatus}
