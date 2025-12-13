@@ -5,7 +5,9 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { parseStatement } from '../utils/moneyHelper';
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// We use a fallback version '3.11.174' just in case pdfjsLib.version is undefined in some builds
+const pdfjsVersion = pdfjsLib.version || '3.11.174';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`;
 
 export default function FileUploader({ onDataParsed }) {
   const [loading, setLoading] = useState(false);
@@ -29,8 +31,9 @@ export default function FileUploader({ onDataParsed }) {
 
     setAiStatus(`🤖 AI is categorising ${unknown.length} remaining items...`);
 
-    const updatedTransactions = [...initialData];
-    
+    // Create a deep copy to avoid mutating state directly (React Best Practice)
+    let currentData = [...initialData];
+
     // Process in batches of 5 to avoid overwhelming the free API
     const batchSize = 5;
     for (let i = 0; i < unknown.length; i += batchSize) {
@@ -45,10 +48,11 @@ export default function FileUploader({ onDataParsed }) {
           
           if (res.ok) {
             const data = await res.json();
-            // Update the transaction in the main list
-            const index = updatedTransactions.findIndex(ut => ut.id === t.id);
+            // Update the transaction in our local tracking array
+            const index = currentData.findIndex(ut => ut.id === t.id);
             if (index !== -1 && data.category && data.category !== 'Other') {
-              updatedTransactions[index].category = data.category;
+              // Create a new object for the updated transaction (Immutability)
+              currentData[index] = { ...currentData[index], category: data.category };
             }
           }
         } catch (err) {
@@ -57,14 +61,16 @@ export default function FileUploader({ onDataParsed }) {
       }));
 
       // Update UI incrementally after each batch
-      onDataParsed([...updatedTransactions]);
+      // We pass a new array reference to trigger the update
+      onDataParsed([...currentData]);
     }
 
     setAiStatus('✅ AI Categorisation Complete');
     setTimeout(() => setAiStatus(''), 3000);
   };
 
-  const handleFileChange = async (acceptedFiles) => {
+  // Logic moved inside useCallback to prevent re-renders
+  const onDrop = useCallback(async (acceptedFiles) => {
     setLoading(true);
     setError(null);
     setAiStatus('');
@@ -92,6 +98,7 @@ export default function FileUploader({ onDataParsed }) {
       setLoading(false);
 
       // 2. Background AI Parse
+      // We pass the data we just parsed to the AI function
       await enrichWithAI(data);
 
     } catch (err) {
@@ -99,9 +106,8 @@ export default function FileUploader({ onDataParsed }) {
       setError(err.message || "Failed to parse bank statement");
       setLoading(false);
     }
-  };
+  }, [customRules, onDataParsed]); // Dependencies: Re-create only if these change
 
-  const onDrop = useCallback(handleFileChange, [customRules]);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop, 
     accept: { 'application/pdf': ['.pdf'] },
