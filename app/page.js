@@ -9,11 +9,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans text-gray-800">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-blue-700 mb-2">🏦 Chase Analyser</h1>
-          <p className="text-gray-500">Secure, client-side bank statement processing</p>
+        
+        {/* 🟢 NEW HEADER: Logo & Subtitle */}
+        <header className="mb-8 text-center flex flex-col items-center">
+          <img 
+            src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo.png" 
+            alt="Only Banks Logo" 
+            className="w-full max-w-xs h-auto mb-4 drop-shadow-sm" 
+          />
+          <p className="text-gray-500 text-lg">Upload your bank statements → Get smart spend insights.</p>
         </header>
 
+        {/* 🟢 CONDITIONAL: Show Uploader OR Dashboard */}
         {transactions.length === 0 ? (
           <FileUploader onDataLoaded={setTransactions} />
         ) : (

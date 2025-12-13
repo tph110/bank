@@ -1,20 +1,80 @@
-'use client'; // Required for browser features like file inputs
-import { useState } from 'react';
+'use client';
+import { useState, useCallback, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
 import * as pdfjsLib from 'pdfjs-dist';
-import { parseChaseStatement } from '@/utils/moneyHelper';
+import { parseStatement } from '../utils/moneyHelper';
 
-// Point to the worker file on a CDN to avoid complex Webpack config
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-export default function FileUploader({ onDataLoaded }) {
+export default function FileUploader({ onDataParsed }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [customRules, setCustomRules] = useState({});
+  const [aiStatus, setAiStatus] = useState('');
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  // Load custom rules on mount
+  useEffect(() => {
+    const savedRules = localStorage.getItem('categoryRules');
+    if (savedRules) {
+      setCustomRules(JSON.parse(savedRules));
+    }
+  }, []);
+
+  // AI Enrichment Function
+  const enrichWithAI = async (initialData) => {
+    const unknown = initialData.filter(t => t.category === 'Other');
+    
+    if (unknown.length === 0) return;
+
+    setAiStatus(`🤖 AI is categorising ${unknown.length} remaining items...`);
+
+    const updatedTransactions = [...initialData];
+    
+    // Process in batches of 5 to avoid overwhelming the free API
+    const batchSize = 5;
+    for (let i = 0; i < unknown.length; i += batchSize) {
+      const batch = unknown.slice(i, i + batchSize);
+      
+      await Promise.all(batch.map(async (t) => {
+        try {
+          const res = await fetch('/api/categorise', {
+            method: 'POST',
+            body: JSON.stringify({ description: t.description }),
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            // Update the transaction in the main list
+            const index = updatedTransactions.findIndex(ut => ut.id === t.id);
+            if (index !== -1 && data.category && data.category !== 'Other') {
+              updatedTransactions[index].category = data.category;
+            }
+          }
+        } catch (err) {
+          console.error("AI Error:", err);
+        }
+      }));
+
+      // Update UI incrementally after each batch
+      onDataParsed([...updatedTransactions]);
+    }
+
+    setAiStatus('✅ AI Categorisation Complete');
+    setTimeout(() => setAiStatus(''), 3000);
+  };
+
+  const handleFileChange = async (acceptedFiles) => {
+    setLoading(true);
+    setError(null);
+    setAiStatus('');
+    const file = acceptedFiles[0];
+
     if (!file) return;
 
-    setLoading(true);
     try {
+      if (file.size > 5 * 1024 * 1024) throw new Error("File too large (Max 5MB)");
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
@@ -22,33 +82,69 @@ export default function FileUploader({ onDataLoaded }) {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ') + ' ';
+        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
       }
 
-      const data = parseChaseStatement(fullText);
-      onDataLoaded(data); // Send data up to the parent
+      // 1. Instant Parse (Local Rules)
+      const data = parseStatement(fullText, pdf.numPages, customRules);
+      onDataParsed(data); // Show results immediately
+
+      setLoading(false);
+
+      // 2. Background AI Parse
+      await enrichWithAI(data);
+
     } catch (err) {
       console.error(err);
-      alert("Failed to parse PDF");
-    } finally {
+      setError(err.message || "Failed to parse bank statement");
       setLoading(false);
     }
   };
 
+  const onDrop = useCallback(handleFileChange, [customRules]);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+    onDrop, 
+    accept: { 'application/pdf': ['.pdf'] },
+    multiple: false
+  });
+
   return (
-    <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:bg-gray-50 transition">
-      <p className="text-xl font-semibold text-blue-600 mb-2">Upload Chase Statement</p>
-      <p className="text-sm text-gray-500 mb-4">Select your .pdf file to begin analysis</p>
-      
-      {loading ? (
-        <p className="text-blue-500 animate-pulse">Processing... please wait</p>
-      ) : (
-        <input 
-          type="file" 
-          accept=".pdf" 
-          onChange={handleFileChange} 
-          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
+    <div className="w-full max-w-2xl mx-auto mb-8">
+      <div 
+        {...getRootProps()} 
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all
+          ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}
+        `}
+      >
+        <input {...getInputProps()} />
+        
+        {loading ? (
+          <div className="space-y-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-600 font-medium">Reading statement...</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-4xl mb-2">📄</div>
+            <p className="text-lg font-medium text-gray-700">
+              {isDragActive ? "Drop the file here" : "Upload your bank statements"}
+            </p>
+            <p className="text-sm text-gray-500">Supports PDF (Chase, Monzo, Lloyds, Santander, Barclays)</p>
+          </div>
+        )}
+      </div>
+
+      {/* AI Status Indicator */}
+      {aiStatus && (
+        <div className="mt-4 p-3 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-lg flex items-center justify-center animate-pulse">
+          {aiStatus}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-lg text-center font-medium">
+          Error: {error}
+        </div>
       )}
     </div>
   );
