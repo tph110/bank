@@ -4,35 +4,38 @@ import { useDropzone } from 'react-dropzone';
 import * as pdfjsLib from 'pdfjs-dist';
 import { parseStatement } from '../utils/moneyHelper';
 
-// ✅ FIX: Hardcode version 3.11.174 to prevent 404 errors
+// ✅ FIX: Hardcode version 3.11.174
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
-export default function FileUploader({ onDataParsed }) {
+export default function FileUploader({ onDataParsed }) { // <--- Needs this prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [customRules, setCustomRules] = useState({});
   const [aiStatus, setAiStatus] = useState('');
 
-  // Load custom rules on mount
   useEffect(() => {
     const savedRules = localStorage.getItem('categoryRules');
-    if (savedRules) {
-      setCustomRules(JSON.parse(savedRules));
-    }
+    if (savedRules) setCustomRules(JSON.parse(savedRules));
   }, []);
 
-  // AI Enrichment Function
+  // Helper to safely send data back to parent
+  const sendDataToParent = (data) => {
+    if (typeof onDataParsed === 'function') {
+      onDataParsed(data);
+    } else {
+      console.error("🚨 PARENT ERROR: <FileUploader> was called without an 'onDataParsed' function!");
+      setError("System Error: The app is not saving the data properly.");
+    }
+  };
+
   const enrichWithAI = async (initialData) => {
     const unknown = initialData.filter(t => t.category === 'Other');
-    
     if (unknown.length === 0) return;
 
     setAiStatus(`🤖 AI is categorising ${unknown.length} remaining items...`);
-
     let currentData = [...initialData];
-
-    // Process in batches of 5
     const batchSize = 5;
+
     for (let i = 0; i < unknown.length; i += batchSize) {
       const batch = unknown.slice(i, i + batchSize);
       
@@ -40,9 +43,7 @@ export default function FileUploader({ onDataParsed }) {
         try {
           const res = await fetch('/api/categorise', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description: t.description }),
           });
           
@@ -58,7 +59,7 @@ export default function FileUploader({ onDataParsed }) {
         }
       }));
 
-      onDataParsed([...currentData]);
+      sendDataToParent([...currentData]); // ✅ SAFE CALL
     }
 
     setAiStatus('✅ AI Categorisation Complete');
@@ -88,7 +89,7 @@ export default function FileUploader({ onDataParsed }) {
 
       // 1. Instant Parse
       const data = parseStatement(fullText, pdf.numPages, customRules);
-      onDataParsed(data); 
+      sendDataToParent(data); // ✅ SAFE CALL
 
       setLoading(false);
 
