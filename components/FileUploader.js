@@ -38,7 +38,6 @@ export default function FileUploader({ onDataParsed }) {
       
       await Promise.all(batch.map(async (t) => {
         try {
-          // ✅ FIX 4: Added Content-Type header so the server knows it's JSON
           const res = await fetch('/api/categorise', {
             method: 'POST',
             headers: {
@@ -66,7 +65,6 @@ export default function FileUploader({ onDataParsed }) {
     setTimeout(() => setAiStatus(''), 3000);
   };
 
-  // ✅ FIX 3: Logic inside useCallback with correct dependencies
   const onDrop = useCallback(async (acceptedFiles) => {
     setLoading(true);
     setError(null);
@@ -102,7 +100,7 @@ export default function FileUploader({ onDataParsed }) {
       setError(err.message || "Failed to parse bank statement");
       setLoading(false);
     }
-  }, [customRules, onDataParsed]); // ✅ Added onDataParsed to dependencies
+  }, [customRules, onDataParsed]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop, 
