@@ -1,6 +1,12 @@
 'use client';
 import { useState } from 'react';
-import FileUploader from '@/components/FileUploader';
+import dynamic from 'next/dynamic';
+
+// This tells Next.js: "Only load this component in the browser, never on the server"
+const FileUploader = dynamic(() => import('../components/FileUploader'), {
+  ssr: false,
+  loading: () => <p>Loading uploader...</p> // Optional loading state
+});;
 import Dashboard from '@/components/Dashboard';
 
 export default function Home() {
