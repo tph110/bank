@@ -57,18 +57,16 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (STRICT FIX)
+// ✅ 3. PARSER FOR SANTANDER
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  // Regex: 27th Oct ... Description ... Amount ... Balance
-  // Greedy match (.*) finds the LAST amount (the Transaction), ignoring tax amounts before it
+  // Greedy match (.*) finds the LAST amount (the Transaction)
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
-    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES
     if (line.includes('Balance brought forward') || 
         line.includes('Balance carried forward') || 
         line.includes('Start Balance') ||
@@ -107,13 +105,13 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (FULL BLOB & CLEANUP)
+// ✅ 4. PARSER FOR BARCLAYS (Final Polish)
 const parseBarclaysStatement = (rawText) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
-  // 1. Normalize text (remove newlines, extra spaces)
+  // 1. Normalize text
   const blob = rawText.replace(/\s+/g, ' ');
 
   // 2. Find Start Balance
@@ -124,7 +122,6 @@ const parseBarclaysStatement = (rawText) => {
   }
 
   // 3. Regex to find "Amount Balance" pairs
-  // This finds the two numbers at the end of every transaction line
   const regex = /((?:\d{1,3},)*\d{1,3}\.\d{2})\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/g;
   
   let match;
@@ -145,36 +142,47 @@ const parseBarclaysStatement = (rawText) => {
       const isIncome = diff > 0;
 
       // Extract Description & Date
-      // Look back ~200 chars to find the text description before the numbers
-      const lookbackStart = Math.max(lastIndex, match.index - 200);
+      const lookbackStart = Math.max(lastIndex, match.index - 250); // Increased lookback slightly
       let descChunk = blob.substring(lookbackStart, match.index).trim();
 
-      // Find Date
+      // Find Date (Prioritise finding the date first)
       const dateMatch = descChunk.match(/(\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/i);
       if (dateMatch) {
         const [_, dateStr] = dateMatch;
         const [day, monthAbbr] = dateStr.split(' ');
         const month = monthMap[monthAbbr.charAt(0).toUpperCase() + monthAbbr.slice(1).toLowerCase()];
         currentDate = `${currentYear}-${month}-${day.padStart(2, '0')}`;
-        // Remove date from description text
+        // Remove date from description
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
-      // 🧹 CLEANUP: Remove PDF Headers/Footers/Junk
+      // 🧹 CLEANUP: Aggressive Garbage Removal
       let cleanDesc = descChunk
+        // Header Removal
         .replace(/Date Description/gi, '')
-        .replace(/Money out £ Money in £ Balance £/gi, '') 
-        .replace(/Balance brought forward from previous page/gi, '') 
-        .replace(/Balance brought forward/gi, '') 
+        .replace(/(?:Money out|ut) £ (?:Money in|in) £ (?:Balance|ance) £/gi, '') 
+        // Header Balance Removal (fixes "ion 353,328.40" artifacts)
+        .replace(/(?:Descrip)?tion\s+[\d,.]+\s*/gi, '') 
+        .replace(/(?:Balance|ance)\s+[\d,.]+\s*/gi, '')
+        
+        // Remove "Start Balance 123.45" literal
+        .replace(/Start Balance\s+[\d,.]+/gi, '')
+        .replace(/Balance brought forward(?: from previous page)?(?: [\d,.]+\s*)?/gi, '')
+
+        // Remove Legal Text junk (e.g., "he Financial Services...")
+        .replace(/.*Financial Services Compensation Scheme\.?/gi, '')
+
+        // Standard Cleanup
         .replace(/Banbury Road Medical Centre/gi, '') 
         .replace(/Sort Code \d{2}-\d{2}-\d{2}/gi, '') 
         .replace(/Account No \d+/gi, '') 
         .replace(/Page \d+/gi, '') 
-        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') // Remove stray dates at start
+        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') 
         .replace(/Continued/gi, '')
+        // Clean leading punctuation
+        .replace(/^[^\w]+/, '') 
         .trim();
 
-      // Only add if description isn't empty
       if (cleanDesc.length > 2) {
         transactions.push({
           id: Math.random().toString(36).substr(2, 9),
@@ -226,7 +234,7 @@ export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
-  // Pre-process for line-based parsers
+  // Pre-process
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
@@ -249,7 +257,6 @@ export const parseStatement = (rawText, pageCount) => {
     bankType = 'Monzo';
   }
   else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { 
-    // Pass RAW text to Barclays parser so it can use blob regex
     data = parseBarclaysStatement(rawText); 
     bankType = 'Barclays';
   }
