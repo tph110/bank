@@ -12,7 +12,6 @@ const MAX_PDF_PAGES = 50;
 const parseChaseStatement = (lines) => {
   const transactions = [];
   const regex = /(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(.*?)\s+(Purchase|Transfer|Refund|Payment)\s+([+-]£[\d,]*\.?\d+)\s+£[\d,]*\.?\d+/;
-  const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
 
   for (const line of lines) {
     if (line.includes('Account number') || line.includes('Opening balance')) continue;
@@ -20,6 +19,7 @@ const parseChaseStatement = (lines) => {
     const match = line.match(regex);
     if (match) {
       const [_, day, monthAbbr, year, brand, typeWord, amountStr] = match;
+      const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
       let cleanAmount = parseFloat(amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim());
       
       transactions.push({
@@ -60,6 +60,7 @@ const parseMonzoStatement = (lines) => {
 // ✅ 3. PARSER FOR SANTANDER
 const parseSantanderStatement = (lines) => {
   const transactions = [];
+  // Greedy match (.*) finds the LAST amount
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
@@ -104,7 +105,7 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (Final Cleanup)
+// ✅ 4. PARSER FOR BARCLAYS (Polished)
 const parseBarclaysStatement = (rawText) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
@@ -158,38 +159,37 @@ const parseBarclaysStatement = (rawText) => {
 
       // 🧹 CLEANUP: Remove Text Artifacts
       let cleanDesc = descChunk
-        // Remove "Start" artifact
-        .replace(/^Start\s*/i, '')
+        // Header Removal
+        .replace(/Date Description/gi, '')
+        .replace(/(?:Money out|ut) £ (?:Money in|in) £ (?:Balance|ance) £/gi, '') 
         
-        // Remove "Money out/in" headers
-        .replace(/(?:Money out|ut) £ (?:Money in|in) £ (?:Balance|ance) £/gi, '')
-        
+        // Remove "Start Balance" phrase specifically
+        .replace(/Start Balance/gi, '')
+
         // Remove Balance brought forward headers
         .replace(/(?:Balance|ion) brought forward(?: from previous page)?(?: [\d,.]+\s*)?/gi, '')
         .replace(/Balance brought forward/gi, '')
         
-        // Remove stray balance numbers like "338,841.70"
+        // Remove stray balance numbers
         .replace(/\b\d{1,3}(?:,\d{3})+\.\d{2}\b/g, '')
 
-        // Remove Sort Code / Account Number Fragments (e.g., "ode 20-65-18", "t Code")
+        // Remove Sort Code / Account No / Page Numbers
         .replace(/(?:Sort Code|t Code|ode)\s*\d{2}-\d{2}-\d{2}(?:\s*•\s*\d+)?/gi, '')
-        .replace(/\d{2}-\d{2}-\d{2}\s*•\s*\d+/gi, '') // "20-65-18 • 4"
+        .replace(/\d{2}-\d{2}-\d{2}\s*•\s*\d+/gi, '')
         .replace(/Account No \d+/gi, '')
-        
-        // Remove Page bullets (e.g., "8 • 2")
-        .replace(/\d+\s*•\s*\d+/g, '')
+        .replace(/Page \d+/gi, '') 
+        .replace(/\d+\s*•\s*\d+/g, '') // Removes "8 • 2"
 
         // Remove Legal Footer Junk
         .replace(/.*Financial Services Compensation Scheme\.?/gi, '')
-        .replace(/to "Barclays Base Rate".*? \d+/gi, '') // "to Barclays Base Rate in this s 5"
+        .replace(/to "Barclays Base Rate".*? \d+/gi, '')
 
         // Standard Cleanup
-        .replace(/Date Description/gi, '')
         .replace(/Banbury Road Medical Centre/gi, '') 
-        .replace(/Page \d+/gi, '') 
         .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') // Stray dates
         .replace(/Continued/gi, '')
         .replace(/^[^\w]+/, '') // Leading punctuation
+        .replace(/^\d+\s+/, '') // Remove leading single numbers (e.g., "3 " or "4 ")
         .trim();
 
       if (cleanDesc.length > 2) {
