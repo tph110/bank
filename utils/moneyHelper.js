@@ -57,16 +57,18 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER
+// ✅ 3. PARSER FOR SANTANDER (STRICT FIX)
 const parseSantanderStatement = (lines) => {
   const transactions = [];
   // Regex: 27th Oct ... Description ... Amount ... Balance
-  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/;
+  // Greedy match (.*) finds the LAST amount (the Transaction), ignoring tax amounts before it
+  const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
+    // 🚫 SKIP HEADERS, FOOTERS, AND BALANCE LINES
     if (line.includes('Balance brought forward') || 
         line.includes('Balance carried forward') || 
         line.includes('Start Balance') ||
@@ -78,6 +80,7 @@ const parseSantanderStatement = (lines) => {
     const match = line.match(regex);
     if (match) {
       const [_, day, monthAbbr, desc, amountStr] = match;
+      
       const description = desc.trim();
       const upperDesc = description.toUpperCase();
       
@@ -104,7 +107,7 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (MATH-BASED)
+// ✅ 4. PARSER FOR BARCLAYS (FULL BLOB & CLEANUP)
 const parseBarclaysStatement = (rawText) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
@@ -113,61 +116,65 @@ const parseBarclaysStatement = (rawText) => {
   // 1. Normalize text (remove newlines, extra spaces)
   const blob = rawText.replace(/\s+/g, ' ');
 
-  // 2. Find Start Balance (Crucial for math check)
+  // 2. Find Start Balance
   let lastBalance = 0;
-  // Look for "Start Balance 123.45" or "Balance brought forward 123.45"
   const startBalMatch = blob.match(/(?:Start Balance|Balance brought forward)[^0-9]*?((?:\d{1,3},)*\d{1,3}\.\d{2})/i);
   if (startBalMatch) {
     lastBalance = parseFloat(startBalMatch[1].replace(/,/g, ''));
   }
 
-  // 3. Regex to find "Amount Balance" pairs (Two numbers at end of transaction)
-  // This ignores the description mess and finds the reliable numbers.
+  // 3. Regex to find "Amount Balance" pairs
+  // This finds the two numbers at the end of every transaction line
   const regex = /((?:\d{1,3},)*\d{1,3}\.\d{2})\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/g;
   
   let match;
   let lastIndex = 0;
-  let currentDate = `${currentYear}-01-01`; // Default
+  let currentDate = `${currentYear}-01-01`;
 
   while ((match = regex.exec(blob)) !== null) {
-    // Amounts found
     const amountStr = match[1];
     const balanceStr = match[2];
     const amount = parseFloat(amountStr.replace(/,/g, ''));
     const balance = parseFloat(balanceStr.replace(/,/g, ''));
 
     // 4. Mathematical Validation
-    // Does PreviousBalance +/- Amount == NewBalance? (Allow 0.05 float error)
     const diff = balance - lastBalance;
     const isValid = Math.abs(Math.abs(diff) - amount) < 0.05;
 
     if (isValid && amount > 0) {
-      // It's a real transaction!
       const isIncome = diff > 0;
 
-      // Extract Description & Date from text BEFORE this match
-      // We look back from current match index to the end of previous match
-      // Limit lookback to ~150 chars to avoid grabbing huge chunks
+      // Extract Description & Date
+      // Look back ~200 chars to find the text description before the numbers
       const lookbackStart = Math.max(lastIndex, match.index - 200);
       let descChunk = blob.substring(lookbackStart, match.index).trim();
 
-      // Find Date in Description (e.g., "1 Nov")
+      // Find Date
       const dateMatch = descChunk.match(/(\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/i);
       if (dateMatch) {
         const [_, dateStr] = dateMatch;
         const [day, monthAbbr] = dateStr.split(' ');
         const month = monthMap[monthAbbr.charAt(0).toUpperCase() + monthAbbr.slice(1).toLowerCase()];
         currentDate = `${currentYear}-${month}-${day.padStart(2, '0')}`;
-        // Remove date from description
+        // Remove date from description text
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
-      // Cleanup Description (remove "Date", junk chars)
+      // 🧹 CLEANUP: Remove PDF Headers/Footers/Junk
       let cleanDesc = descChunk
         .replace(/Date Description/gi, '')
-        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') // Remove duplicate dates at start
+        .replace(/Money out £ Money in £ Balance £/gi, '') 
+        .replace(/Balance brought forward from previous page/gi, '') 
+        .replace(/Balance brought forward/gi, '') 
+        .replace(/Banbury Road Medical Centre/gi, '') 
+        .replace(/Sort Code \d{2}-\d{2}-\d{2}/gi, '') 
+        .replace(/Account No \d+/gi, '') 
+        .replace(/Page \d+/gi, '') 
+        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') // Remove stray dates at start
+        .replace(/Continued/gi, '')
         .trim();
 
+      // Only add if description isn't empty
       if (cleanDesc.length > 2) {
         transactions.push({
           id: Math.random().toString(36).substr(2, 9),
@@ -177,12 +184,10 @@ const parseBarclaysStatement = (rawText) => {
           type: isIncome ? 'income' : 'expense',
         });
         
-        // Update balance tracker
         lastBalance = balance;
       }
     }
     
-    // Update index for next iteration
     lastIndex = match.index + match[0].length;
   }
 
@@ -221,7 +226,7 @@ export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
-  // Pre-process for common formats
+  // Pre-process for line-based parsers
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
@@ -244,7 +249,7 @@ export const parseStatement = (rawText, pageCount) => {
     bankType = 'Monzo';
   }
   else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { 
-    // Pass rawText directly for the blob parser
+    // Pass RAW text to Barclays parser so it can use blob regex
     data = parseBarclaysStatement(rawText); 
     bankType = 'Barclays';
   }
