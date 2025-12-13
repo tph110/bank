@@ -157,39 +157,26 @@ const parseBarclaysStatement = (rawText) => {
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
-      // 🧹 CLEANUP: Remove Text Artifacts
+      // 🧹 CLEANUP
       let cleanDesc = descChunk
-        // Header Removal
         .replace(/Date Description/gi, '')
         .replace(/(?:Money out|ut) £ (?:Money in|in) £ (?:Balance|ance) £/gi, '') 
-        
-        // Remove "Start Balance" phrase specifically
         .replace(/Start Balance/gi, '')
-
-        // Remove Balance brought forward headers
         .replace(/(?:Balance|ion) brought forward(?: from previous page)?(?: [\d,.]+\s*)?/gi, '')
         .replace(/Balance brought forward/gi, '')
-        
-        // Remove stray balance numbers
         .replace(/\b\d{1,3}(?:,\d{3})+\.\d{2}\b/g, '')
-
-        // Remove Sort Code / Account No / Page Numbers
         .replace(/(?:Sort Code|t Code|ode)\s*\d{2}-\d{2}-\d{2}(?:\s*•\s*\d+)?/gi, '')
         .replace(/\d{2}-\d{2}-\d{2}\s*•\s*\d+/gi, '')
         .replace(/Account No \d+/gi, '')
         .replace(/Page \d+/gi, '') 
-        .replace(/\d+\s*•\s*\d+/g, '') // Removes "8 • 2"
-
-        // Remove Legal Footer Junk
+        .replace(/\d+\s*•\s*\d+/g, '') 
         .replace(/.*Financial Services Compensation Scheme\.?/gi, '')
         .replace(/to "Barclays Base Rate".*? \d+/gi, '')
-
-        // Standard Cleanup
         .replace(/Banbury Road Medical Centre/gi, '') 
-        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') // Stray dates
+        .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') 
         .replace(/Continued/gi, '')
-        .replace(/^[^\w]+/, '') // Leading punctuation
-        .replace(/^\d+\s+/, '') // Remove leading single numbers (e.g., "3 " or "4 ")
+        .replace(/^[^\w]+/, '') 
+        .replace(/^\d+\s+/, '') 
         .trim();
 
       if (cleanDesc.length > 2) {
@@ -289,23 +276,50 @@ export const parseStatement = (rawText, pageCount) => {
   }));
 };
 
-// ✅ 7. CATEGORISATION
+// ✅ 7. CATEGORISATION (MASSIVELY UPGRADED)
 export const categoriseTransaction = (description) => {
   const desc = description.toLowerCase().trim();
+  
   const rules = [
-    { keywords: ['tesco', 'sainsbury', 'aldi', 'waitrose', 'co-op', 'coop', 'ocado', 'asda', 'lidl', 'morrisons', 'm&s', 'iceland'], category: 'Groceries' },
-    { keywords: ['pret', 'costa', 'starbucks', 'greggs', 'mcdonald', 'burger king', 'nando', 'deliveroo', 'just eat', 'uber eats', 'cafe', 'coffee', 'kfc', 'subway'], category: 'Eating out' },
-    { keywords: ['amazon', 'argos', 'boots', 'superdrug', 'whsmith', 'next', 'zara', 'asos', 'temu', 'shein', 'ikea', 'primark'], category: 'Shopping' },
-    { keywords: ['petrol', 'fuel', 'shell', 'bp', 'trainline', 'tfl', 'uber', 'bolt', 'taxi', 'bus', 'transport', 'parking'], category: 'Transport' },
-    { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor', 'medical'], category: 'Health & Personal' },
-    { keywords: ['netflix', 'spotify', 'disney', 'prime', 'apple', 'klarna', 'hbo', 'youtube'], category: 'Subscriptions' },
-    { keywords: ['chase saver', 'rewards', 'transfer', 'savings', 'invest', 'trading 212'], category: 'Transfers' },
-    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund', 'cashback', 'credit from'], category: 'Income' },
+    // 1. INCOME
+    { keywords: ['salary', 'wage', 'payroll', 'income', 'dividend', 'receipt', 'refund', 'cashback', 'credit from', 'deposit', 'interest paid'], category: 'Income' },
+    
+    // 2. BILLS & UTILITIES (New)
+    { keywords: ['british gas', 'edf', 'e.on', 'octopus', 'scottish power', 'bulb', 'shell energy', 'utilita', 'ovo', 'water', 'council tax', 'wod ct', 'ct dd', 'telecom', 'bt', 'sky', 'virgin media', 'talktalk', 'ee limited', 'ee ltd', 'vodafone', 'o2', 'three', 'plusnet', 'mobile'], category: 'Bills & Utilities' },
+    
+    // 3. TAX & INSURANCE (New)
+    { keywords: ['hmrc', 'tax', 'vat', 'national insurance'], category: 'Tax' },
+    { keywords: ['admiral', 'aviva', 'direct line', 'hastings', 'churchill', 'axa', 'insurance', 'cover', 'protect', 'mddus', 'mdu', 'mps'], category: 'Insurance & Professional' },
+
+    // 4. BUSINESS SERVICES (New)
+    { keywords: ['stripe', 'gocardless', 'izettle', 'sumup', 'paypal', 'restore datashred', 'ico', 'companies house', 'xero', 'quickbooks', 'sage', 'iris payroll', 'iris business', 'aws', 'google cloud', 'slack', 'zoom', 'microsoft'], category: 'Business Services' },
+
+    // 5. GROCERIES
+    { keywords: ['tesco', 'sainsbury', 'aldi', 'waitrose', 'co-op', 'coop', 'ocado', 'asda', 'lidl', 'morrisons', 'm&s', 'iceland', 'farmfoods', 'whole foods'], category: 'Groceries' },
+    
+    // 6. EATING OUT
+    { keywords: ['pret', 'costa', 'starbucks', 'greggs', 'mcdonald', 'burger king', 'nando', 'deliveroo', 'just eat', 'uber eats', 'cafe', 'coffee', 'kfc', 'subway', 'pizza', 'restaurant', 'bar', 'pub', 'wetherspoon'], category: 'Eating out' },
+    
+    // 7. SHOPPING
+    { keywords: ['amazon', 'amzn', 'argos', 'boots', 'superdrug', 'whsmith', 'next', 'zara', 'asos', 'temu', 'shein', 'ikea', 'primark', 'ebay', 'shopify', 'currys', 'john lewis', 'tk maxx', 'decathlon', 'sports direct'], category: 'Shopping' },
+    
+    // 8. TRANSPORT (Fixed 'bus')
+    { keywords: ['petrol', 'fuel', 'shell', 'bp', 'esso', 'texaco', 'trainline', 'tfl', 'transport for london', 'uber', 'bolt', 'taxi', 'parking', 'garage', 'gwr', 'rail', 'train', 'ticket', 'stagecoach', 'arriva', 'first bus', 'go ahead'], category: 'Transport' },
+    
+    // 9. HEALTH & WELLBEING (Expanded)
+    { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor', 'medical', 'hospital', 'optician', 'boots opticians', 'specsavers', 'holland & barrett', 'aventis', 'boc', 'primary care'], category: 'Health & Wellbeing' },
+    
+    // 10. SUBSCRIPTIONS
+    { keywords: ['netflix', 'spotify', 'disney', 'prime', 'apple', 'klarna', 'hbo', 'youtube', 'audible', 'playstation', 'xbox', 'nintendo', 'news'], category: 'Subscriptions' },
+    
+    // 11. TRANSFERS
+    { keywords: ['chase saver', 'rewards', 'transfer', 'savings', 'invest', 'trading 212', 'vanguard', 'hargreaves', 'moneybox', 'plum'], category: 'Transfers' },
   ];
 
   for (const rule of rules) {
     if (rule.keywords.some(kw => desc.includes(kw))) return rule.category;
   }
+
   return 'Other';
 };
 
