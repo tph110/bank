@@ -11,10 +11,12 @@
   "dependencies": {
     "chart.js": "^4.5.1",
     "next": "16.0.8",
+    "openai": "^6.10.0",
     "pdfjs-dist": "^5.4.449",
     "react": "19.2.1",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "react-dropzone": "^14.3.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
