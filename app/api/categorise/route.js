@@ -1,45 +1,52 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
-
-// Initialize OpenRouter client
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY, // Reads from your .env.local file
-});
 
 export async function POST(req) {
   try {
     const { description } = await req.json();
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!description) {
-      return NextResponse.json({ error: "No description provided" }, { status: 400 });
+    if (!apiKey) {
+      console.error("❌ Missing API Key");
+      return NextResponse.json({ error: "Server Error: API Key missing" }, { status: 500 });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "nex-agi/deepseek-v3.1-nex-n1:free", // The free model you requested
-      messages: [
-        {
-          role: "system",
-          content: "You are a precise financial assistant. Categorise the following bank transaction description into exactly ONE of these categories: [Groceries, Eating out, Transport, Shopping, Bills & Utilities, Tax, Insurance & Professional, Business Services, Health & Wellbeing, Subscriptions, Transfers, Income]. Return ONLY the category name. Do not add punctuation or extra words."
-        },
-        {
-          role: "user",
-          content: description
-        }
-      ],
-      temperature: 0.1, // Low temperature for consistent answers
+    // Using Google's Gemini Flash Lite (Free & Very Fast) - highly recommended for categories
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://onlybanks.vercel.app/", 
+        "X-Title": "OnlyBanks",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+        messages: [
+          {
+            role: "system",
+            content: "You are a precise financial assistant. Categorise the transaction description into exactly ONE of: [Groceries, Eating out, Transport, Shopping, Bills & Utilities, Tax, Insurance & Professional, Business Services, Health & Wellbeing, Subscriptions, Transfers, Income]. Return ONLY the category name. No punctuation."
+          },
+          { role: "user", content: description }
+        ],
+        temperature: 0.1,
+      })
     });
 
-    // Extract the answer
-    let category = completion.choices[0].message.content.trim();
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ OpenRouter Error:", errorText);
+      throw new Error(`OpenRouter responded with ${response.status}: ${errorText}`);
+    }
 
-    // Cleanup: Remove any trailing periods or quotes if the AI adds them
-    category = category.replace(/['".]/g, '');
+    const data = await response.json();
+    let category = data.choices[0]?.message?.content?.trim() || "Other";
+    category = category.replace(/['".]/g, ''); // Clean up
 
     return NextResponse.json({ category });
-    
+
   } catch (error) {
-    console.error("AI Categorisation failed:", error);
-    return NextResponse.json({ category: "Other" }, { status: 500 });
+    console.error("❌ Categorisation Failed:", error.message);
+    // Return 'Other' so the UI doesn't break, but log the real error above
+    return NextResponse.json({ category: "Other" });
   }
 }
