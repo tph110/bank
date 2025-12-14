@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { generateInsights } from '../utils/moneyHelper';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 
-// Dynamic Import
+// Dynamic Imports
 const FileUploader = dynamic(() => import('../components/FileUploader'), {
   ssr: false,
   loading: () => (
@@ -12,6 +12,10 @@ const FileUploader = dynamic(() => import('../components/FileUploader'), {
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>
   )
+});
+
+const Chatbot = dynamic(() => import('../components/Chatbot'), { 
+  ssr: false 
 });
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c'];
@@ -33,7 +37,7 @@ export default function Home() {
   const [budgets, setBudgets] = useState({});
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   
-  // ✅ STATE: Collapsible Sections
+  // State for Collapsible Sections
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
   const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
@@ -67,7 +71,9 @@ export default function Home() {
       if (!grouped[month]) grouped[month] = 0;
       grouped[month] += t.amount;
     });
-    return Object.entries(grouped).map(([month, total]) => ({ month, total })).sort((a, b) => a.month.localeCompare(b.month));
+    return Object.entries(grouped)
+      .map(([month, total]) => ({ month, total }))
+      .sort((a, b) => a.month.localeCompare(b.month));
   }, [transactions]);
 
   const budgetData = useMemo(() => {
@@ -153,6 +159,7 @@ export default function Home() {
 
         {transactions.length > 0 && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">Total Income</p>
@@ -177,6 +184,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[400px] flex flex-col">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 sm:mb-6">Spending Breakdown</h3>
@@ -208,6 +216,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Filters */}
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                 <h3 className="text-lg font-bold text-slate-800">Filters</h3>
@@ -240,29 +249,17 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              {(filterCategory || filterDateFrom || filterDateTo || filterAmountMin || filterAmountMax) && (
-                <div className="mt-3 text-xs text-blue-600 font-medium">Showing {filteredTransactions.length} of {transactions.length} transactions</div>
-              )}
             </div>
 
-            {/* ✅ BUDGET SECTION (COLLAPSIBLE) */}
+            {/* Budget Section (Collapsible) */}
             {budgetData.length > 0 && (
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
-                <div 
-                  className="flex justify-between items-center cursor-pointer select-none"
-                  onClick={() => setIsBudgetExpanded(!isBudgetExpanded)}
-                >
+                <div className="flex justify-between items-center cursor-pointer select-none" onClick={() => setIsBudgetExpanded(!isBudgetExpanded)}>
                   <h3 className="text-lg font-bold text-slate-800">Budget vs Actual</h3>
-                  <button 
-                    className="text-slate-400 hover:text-blue-600 text-2xl font-light focus:outline-none transition-colors"
-                    aria-label={isBudgetExpanded ? "Collapse budget section" : "Expand budget section"}
-                  >
-                    {isBudgetExpanded ? '−' : '+'}
-                  </button>
+                  <span className="text-slate-400 hover:text-blue-600 text-2xl font-light">{isBudgetExpanded ? '−' : '+'}</span>
                 </div>
-                
                 {isBudgetExpanded && (
-                  <div className="space-y-3 sm:space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     {budgetData.map((item) => {
                       const isOverBudget = item.budget > 0 && item.actual > item.budget;
                       const barColor = item.budget === 0 ? 'bg-blue-500' : (isOverBudget ? 'bg-rose-500' : 'bg-emerald-500');
@@ -271,7 +268,7 @@ export default function Home() {
                         <div key={item.category} className="space-y-2">
                           <div className="flex justify-between items-center text-sm">
                             <span className="font-medium text-slate-700">{item.category}</span>
-                            <div className="flex gap-2 sm:gap-4 text-xs">
+                            <div className="flex gap-4 text-xs">
                               <span className="text-slate-500">Budget: £{item.budget.toFixed(2)}</span>
                               <span className={isOverBudget ? 'text-rose-600 font-semibold' : 'text-emerald-600'}>Spent: £{item.actual.toFixed(2)}</span>
                             </div>
@@ -279,7 +276,6 @@ export default function Home() {
                           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                             <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${barWidth}%` }} />
                           </div>
-                          {isOverBudget && (<p className="text-xs text-rose-600 font-medium">⚠️ Over budget by £{Math.abs(item.remaining).toFixed(2)}</p>)}
                         </div>
                       );
                     })}
@@ -288,73 +284,36 @@ export default function Home() {
               </div>
             )}
 
-            {/* ✅ UPDATED MONTHLY TREND (COLLAPSIBLE + LINE CHART) */}
+            {/* Monthly Trend (Collapsible + Line Chart) */}
             {monthlyData.length > 1 && (
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
-                <div 
-                  className="flex justify-between items-center cursor-pointer select-none"
-                  onClick={() => setIsTrendExpanded(!isTrendExpanded)}
-                >
+                <div className="flex justify-between items-center cursor-pointer select-none" onClick={() => setIsTrendExpanded(!isTrendExpanded)}>
                   <h3 className="text-lg font-bold text-slate-800">Monthly Spending Trend</h3>
-                  <button 
-                    className="text-slate-400 hover:text-blue-600 text-2xl font-light focus:outline-none transition-colors"
-                    aria-label={isTrendExpanded ? "Collapse trend section" : "Expand trend section"}
-                  >
-                    {isTrendExpanded ? '−' : '+'}
-                  </button>
+                  <span className="text-slate-400 hover:text-blue-600 text-2xl font-light">{isTrendExpanded ? '−' : '+'}</span>
                 </div>
-
                 {isTrendExpanded && (
                   <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="w-full h-64 sm:h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-                          <YAxis tick={{ fontSize: 12 }} />
-                          <Tooltip formatter={(value) => `£${value.toFixed(2)}`} />
-                          <Line type="monotone" dataKey="total" stroke="#0088FE" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        <LineChart data={monthlyData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `£${value}`} />
+                          <Tooltip formatter={(value) => `£${value.toFixed(2)}`} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Line type="monotone" dataKey="total" stroke="#0088FE" strokeWidth={3} dot={{ r: 4, fill: '#0088FE', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                    {monthlyData.length >= 2 && (
-                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-blue-900">
-                          {(() => {
-                            const latest = monthlyData[monthlyData.length - 1].total;
-                            const previous = monthlyData[monthlyData.length - 2].total;
-                            const change = ((latest - previous) / previous) * 100;
-                            const isIncrease = change > 0;
-                            return (<>{isIncrease ? '📈' : '📉'} Spending {isIncrease ? 'increased' : 'decreased'} by <span className="font-bold">{Math.abs(change).toFixed(1)}%</span> compared to last month</>);
-                          })()}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
             )}
 
+            {/* Transaction Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
                 <h3 className="font-bold text-slate-700">Transactions ({filteredTransactions.length})</h3>
                 <button onClick={downloadCSV} className="w-full sm:w-auto text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 transition-colors px-3 py-1.5 bg-blue-50 rounded-lg hover:bg-blue-100">⬇️ Download CSV</button>
-              </div>
-              <div className="sm:hidden divide-y divide-slate-100">
-                {filteredTransactions.map((t) => (
-                  <div key={t.id} className="p-4 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-800 text-sm mb-1">{t.description}</p>
-                        <p className="text-xs text-slate-500">{t.date}</p>
-                      </div>
-                      <p className={`text-base font-bold ml-2 ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        {t.type === 'income' ? '+' : ''}£{t.amount.toFixed(2)}
-                      </p>
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${t.category === 'Income' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : t.category === 'Other' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{t.category}</span>
-                  </div>
-                ))}
               </div>
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -370,9 +329,9 @@ export default function Home() {
                     {filteredTransactions.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
                         <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-mono">{t.date}</td>
-                        <td className="p-4 text-slate-800 text-sm font-medium truncate max-w-xs" title={t.description}>{t.description}</td>
+                        <td className="p-4 text-slate-800 text-sm font-medium truncate max-w-xs">{t.description}</td>
                         <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${t.category === 'Income' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : t.category === 'Other' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{t.category}</span>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${t.category === 'Income' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{t.category}</span>
                         </td>
                         <td className={`p-4 text-right text-sm font-mono font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>{t.type === 'income' ? '+' : ''}£{t.amount.toFixed(2)}</td>
                       </tr>
@@ -385,6 +344,7 @@ export default function Home() {
         )}
       </div>
 
+      {/* Modals & Overlays */}
       {showBudgetModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
@@ -407,6 +367,9 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* AI Chatbot */}
+      {transactions.length > 0 && <Chatbot transactions={transactions} />}
     </main>
   );
 }
