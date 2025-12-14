@@ -12,13 +12,12 @@ export async function POST(req) {
     const { message, context } = await req.json();
 
     if (!process.env.OPENROUTER_API_KEY) {
-      console.error("❌ API Key is missing on the server!");
       return NextResponse.json({ error: "Server Error: API Key missing." }, { status: 500 });
     }
 
     const completion = await openai.chat.completions.create({
-      // Using a very reliable free model
-      model: "meta-llama/llama-3-8b-instruct:free",
+      // ✅ UPDATED: Using the DeepSeek model that works for your account
+      model: "nex-agi/deepseek-v3.1-nex-n1:free",
       messages: [
         {
           role: "system",
@@ -41,6 +40,7 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("Chat Error:", error);
-    return NextResponse.json({ error: "Failed to connect to AI." }, { status: 500 });
+    // Provide a more helpful error message
+    return NextResponse.json({ error: "Failed to connect to AI (Model Error)." }, { status: 500 });
   }
 }
