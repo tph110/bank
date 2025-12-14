@@ -276,7 +276,7 @@ export const parseStatement = (rawText, pageCount) => {
   }));
 };
 
-// ✅ 7. CATEGORISATION (MASSIVELY UPGRADED)
+// ✅ 7. CATEGORISATION (MASSIVELY UPGRADED) - Updated with "petrol station" first
 export const categoriseTransaction = (description) => {
   const desc = description.toLowerCase().trim();
   
@@ -303,8 +303,8 @@ export const categoriseTransaction = (description) => {
     // 7. SHOPPING
     { keywords: ['amazon', 'amzn', 'argos', 'boots', 'superdrug', 'whsmith', 'next', 'zara', 'asos', 'temu', 'shein', 'ikea', 'primark', 'ebay', 'shopify', 'currys', 'john lewis', 'tk maxx', 'decathlon', 'sports direct'], category: 'Shopping' },
     
-    // 8. TRANSPORT (Fixed 'bus')
-    { keywords: ['petrol', 'fuel', 'shell', 'bp', 'esso', 'texaco', 'trainline', 'tfl', 'transport for london', 'uber', 'bolt', 'taxi', 'parking', 'garage', 'gwr', 'rail', 'train', 'ticket', 'stagecoach', 'arriva', 'first bus', 'go ahead'], category: 'Transport' },
+    // 8. TRANSPORT (UPDATED: "petrol station" added first for priority matching)
+    { keywords: ['petrol station', 'petrol', 'fuel', 'shell', 'bp', 'esso', 'texaco', 'trainline', 'tfl', 'transport for london', 'uber', 'bolt', 'taxi', 'parking', 'garage', 'gwr', 'rail', 'train', 'ticket', 'stagecoach', 'arriva', 'first bus', 'go ahead'], category: 'Transport' },
     
     // 9. HEALTH & WELLBEING (Expanded)
     { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor', 'medical', 'hospital', 'optician', 'boots opticians', 'specsavers', 'holland & barrett', 'aventis', 'boc', 'primary care'], category: 'Health & Wellbeing' },
