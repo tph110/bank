@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { generateInsights } from '../utils/moneyHelper';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 // Dynamic Import
 const FileUploader = dynamic(() => import('../components/FileUploader'), {
@@ -33,8 +33,9 @@ export default function Home() {
   const [budgets, setBudgets] = useState({});
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   
-  // ✅ NEW STATE: Controls the collapsed/expanded state of the Budget section
+  // ✅ STATE: Collapsible Sections
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
+  const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
   const handleDataParsed = (data) => {
     setTransactions(data);
@@ -244,7 +245,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* ✅ UPDATED BUDGET SECTION (COLLAPSIBLE) */}
+            {/* ✅ BUDGET SECTION (COLLAPSIBLE) */}
             {budgetData.length > 0 && (
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
                 <div 
@@ -287,31 +288,48 @@ export default function Home() {
               </div>
             )}
 
+            {/* ✅ UPDATED MONTHLY TREND (COLLAPSIBLE + LINE CHART) */}
             {monthlyData.length > 1 && (
-              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Monthly Spending Trend</h3>
-                <div className="w-full h-64 sm:h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value) => `£${value.toFixed(2)}`} />
-                      <Bar dataKey="total" fill="#0088FE" />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
+                <div 
+                  className="flex justify-between items-center cursor-pointer select-none"
+                  onClick={() => setIsTrendExpanded(!isTrendExpanded)}
+                >
+                  <h3 className="text-lg font-bold text-slate-800">Monthly Spending Trend</h3>
+                  <button 
+                    className="text-slate-400 hover:text-blue-600 text-2xl font-light focus:outline-none transition-colors"
+                    aria-label={isTrendExpanded ? "Collapse trend section" : "Expand trend section"}
+                  >
+                    {isTrendExpanded ? '−' : '+'}
+                  </button>
                 </div>
-                {monthlyData.length >= 2 && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-900">
-                      {(() => {
-                        const latest = monthlyData[monthlyData.length - 1].total;
-                        const previous = monthlyData[monthlyData.length - 2].total;
-                        const change = ((latest - previous) / previous) * 100;
-                        const isIncrease = change > 0;
-                        return (<>{isIncrease ? '📈' : '📉'} Spending {isIncrease ? 'increased' : 'decreased'} by <span className="font-bold">{Math.abs(change).toFixed(1)}%</span> compared to last month</>);
-                      })()}
-                    </p>
+
+                {isTrendExpanded && (
+                  <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="w-full h-64 sm:h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={60} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip formatter={(value) => `£${value.toFixed(2)}`} />
+                          <Line type="monotone" dataKey="total" stroke="#0088FE" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {monthlyData.length >= 2 && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-900">
+                          {(() => {
+                            const latest = monthlyData[monthlyData.length - 1].total;
+                            const previous = monthlyData[monthlyData.length - 2].total;
+                            const change = ((latest - previous) / previous) * 100;
+                            const isIncrease = change > 0;
+                            return (<>{isIncrease ? '📈' : '📉'} Spending {isIncrease ? 'increased' : 'decreased'} by <span className="font-bold">{Math.abs(change).toFixed(1)}%</span> compared to last month</>);
+                          })()}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
