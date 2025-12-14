@@ -87,8 +87,9 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            {/* ✅ NEW LOGO URL UPDATED HERE */}
             <img 
-              src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo.png" 
+              src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo2.png" 
               alt="OnlyBanks Logo" 
               className="h-16 w-auto object-contain"
             />
