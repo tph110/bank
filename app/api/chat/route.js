@@ -27,7 +27,7 @@ export async function POST(req) {
       },
       body: JSON.stringify({
         // ✅ FIX 1: Try the stable model name format
-        model: "google/gemini-flash-1.5",
+        model: "google/gemini-2.0-flash-exp:free",
         messages: [
           {
             role: "system",
