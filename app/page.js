@@ -183,7 +183,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 🟢 Smart Insights (Moved Next to Chart) */}
+              {/* 🟢 Smart Insights */}
               <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100 shadow-sm flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="bg-indigo-600 text-white p-1.5 rounded-lg text-sm">💡</span>
