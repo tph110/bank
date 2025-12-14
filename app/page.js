@@ -37,34 +37,40 @@ export default function Home() {
       
       {/* 🟢 Header Section */}
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* ✅ LOGO MADE LARGER (h-16) */}
             <img 
               src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo.png" 
-              alt="Bank Analyser Logo" 
-              className="h-10 w-auto"
+              alt="OnlyBanks Logo" 
+              className="h-16 w-auto object-contain"
             />
-            <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              Statement<span className="text-blue-600">Analyser</span>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+              Only<span className="text-blue-600">Banks</span>
             </h1>
           </div>
-          <a href="#" className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+          >
             Reset
-          </a>
+          </button>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 mt-10 space-y-10">
+      <div className="max-w-5xl mx-auto px-6 mt-12 space-y-12">
         
-        {/* 🟢 Upload Section */}
-        <section className="text-center space-y-4">
-          <h2 className="text-3xl font-extrabold text-slate-900">
-            Understand your spending in seconds
+        {/* 🟢 Hero / Upload Section */}
+        <section className="text-center space-y-6">
+          <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">
+             Financial clarity in seconds.
           </h2>
-          <p className="text-lg text-slate-500 max-w-xl mx-auto">
-            Securely analyse your PDF bank statements without data leaving your browser.
+          {/* ✅ NEW DESCRIPTION ADDED HERE */}
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            A secure, AI-powered tool providing financial insights for individuals and businesses looking to maximise cashflow through detailed analytics.
           </p>
-          <div className="mt-8">
+          
+          <div className="mt-10">
             <FileUploader onDataParsed={handleDataParsed} />
           </div>
         </section>
@@ -125,7 +131,7 @@ export default function Home() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="font-bold text-slate-700">Transactions ({transactions.length})</h3>
-                <button className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                <button className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
                   ⬇️ Download CSV
                 </button>
               </div>
