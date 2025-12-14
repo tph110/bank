@@ -1,48 +1,54 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
-
-// Initialize OpenRouter client (Same as your working categorise route)
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY, 
-});
 
 export async function POST(req) {
   try {
     const { message, context } = await req.json();
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.error("❌ Chat API Error: Missing API Key");
+    if (!apiKey) {
       return NextResponse.json({ error: "Server Error: API Key missing." }, { status: 500 });
     }
 
-    const completion = await openai.chat.completions.create({
-      // ✅ USING THE WORKING MODEL
-      model: "nex-agi/deepseek-v3.1-nex-n1:free",
-      messages: [
-        {
-          role: "system",
-          content: `You are a helpful financial assistant for "OnlyBanks". 
-          The user has uploaded their bank statement. 
-          Here is the JSON data of their transactions:
-          ${JSON.stringify(context)}
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://onlybanks.vercel.app/", 
+        "X-Title": "OnlyBanks",
+      },
+      body: JSON.stringify({
+        // ✅ Using the same reliable model
+        model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful financial assistant for "OnlyBanks". 
+            Here is the user's transaction data JSON:
+            ${JSON.stringify(context)}
 
-          Answer the user's question based strictly on this data.
-          - Be concise and friendly.
-          - If asked about totals, calculate them from the data provided.
-          - Format currency as GBP (£).`
-        },
-        { role: "user", content: message }
-      ],
+            Answer the user's question based strictly on this data.
+            - Be concise and friendly.
+            - Format currency as GBP (£).`
+          },
+          { role: "user", content: message }
+        ]
+      })
     });
 
-    // Extract the answer
-    const reply = completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ OpenRouter Error:", errorText);
+      throw new Error(`OpenRouter Error: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const reply = data.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
     
     return NextResponse.json({ reply });
 
   } catch (error) {
-    console.error("❌ Chat API Error:", error);
-    return NextResponse.json({ error: "Failed to connect to AI." }, { status: 500 });
+    console.error("❌ Chat Error:", error.message);
+    return NextResponse.json({ error: "I'm having trouble connecting to the AI right now. Please try again later." }, { status: 500 });
   }
 }
