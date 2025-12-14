@@ -116,13 +116,13 @@ export default function Home() {
             A secure, AI-powered tool providing financial insights for individuals and businesses looking to maximise cashflow through detailed analytics.
           </p>
           
-          {/* 🔒 SECURITY BADGE ADDED HERE */}
+          {/* 🔒 SECURITY BADGE */}
           <div className="flex items-center justify-center gap-2 text-sm text-slate-600 bg-white border border-slate-200 shadow-sm py-2 px-4 rounded-full w-fit mx-auto mt-6">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-500">
               <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
             </svg>
             <span className="font-medium">
-              No personal data leaves your device. Only transaction info is analysed.
+              None of your personal information will leave your device. Only transaction data is extracted and analysed.
             </span>
           </div>
 
