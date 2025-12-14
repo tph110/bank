@@ -32,6 +32,9 @@ export default function Home() {
   const [filterAmountMax, setFilterAmountMax] = useState('');
   const [budgets, setBudgets] = useState({});
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  
+  // ✅ NEW STATE: Controls the collapsed/expanded state of the Budget section
+  const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
 
   const handleDataParsed = (data) => {
     setTransactions(data);
@@ -241,31 +244,46 @@ export default function Home() {
               )}
             </div>
 
+            {/* ✅ UPDATED BUDGET SECTION (COLLAPSIBLE) */}
             {budgetData.length > 0 && (
-              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Budget vs Actual</h3>
-                <div className="space-y-3 sm:space-y-4">
-                  {budgetData.map((item) => {
-                    const isOverBudget = item.budget > 0 && item.actual > item.budget;
-                    const barColor = item.budget === 0 ? 'bg-blue-500' : (isOverBudget ? 'bg-rose-500' : 'bg-emerald-500');
-                    const barWidth = item.budget > 0 ? Math.min((item.actual / item.budget) * 100, 100) : 100;
-                    return (
-                      <div key={item.category} className="space-y-2">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-medium text-slate-700">{item.category}</span>
-                          <div className="flex gap-2 sm:gap-4 text-xs">
-                            <span className="text-slate-500">Budget: £{item.budget.toFixed(2)}</span>
-                            <span className={isOverBudget ? 'text-rose-600 font-semibold' : 'text-emerald-600'}>Spent: £{item.actual.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${barWidth}%` }} />
-                        </div>
-                        {isOverBudget && (<p className="text-xs text-rose-600 font-medium">⚠️ Over budget by £{Math.abs(item.remaining).toFixed(2)}</p>)}
-                      </div>
-                    );
-                  })}
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
+                <div 
+                  className="flex justify-between items-center cursor-pointer select-none"
+                  onClick={() => setIsBudgetExpanded(!isBudgetExpanded)}
+                >
+                  <h3 className="text-lg font-bold text-slate-800">Budget vs Actual</h3>
+                  <button 
+                    className="text-slate-400 hover:text-blue-600 text-2xl font-light focus:outline-none transition-colors"
+                    aria-label={isBudgetExpanded ? "Collapse budget section" : "Expand budget section"}
+                  >
+                    {isBudgetExpanded ? '−' : '+'}
+                  </button>
                 </div>
+                
+                {isBudgetExpanded && (
+                  <div className="space-y-3 sm:space-y-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {budgetData.map((item) => {
+                      const isOverBudget = item.budget > 0 && item.actual > item.budget;
+                      const barColor = item.budget === 0 ? 'bg-blue-500' : (isOverBudget ? 'bg-rose-500' : 'bg-emerald-500');
+                      const barWidth = item.budget > 0 ? Math.min((item.actual / item.budget) * 100, 100) : 100;
+                      return (
+                        <div key={item.category} className="space-y-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium text-slate-700">{item.category}</span>
+                            <div className="flex gap-2 sm:gap-4 text-xs">
+                              <span className="text-slate-500">Budget: £{item.budget.toFixed(2)}</span>
+                              <span className={isOverBudget ? 'text-rose-600 font-semibold' : 'text-emerald-600'}>Spent: £{item.actual.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${barWidth}%` }} />
+                          </div>
+                          {isOverBudget && (<p className="text-xs text-rose-600 font-medium">⚠️ Over budget by £{Math.abs(item.remaining).toFixed(2)}</p>)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
