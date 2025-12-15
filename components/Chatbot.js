@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 
 export default function Chatbot({ transactions }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,6 +9,60 @@ export default function Chatbot({ transactions }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // ✅ Create a smart summary of transactions for the AI
+  const transactionSummary = useMemo(() => {
+    if (!transactions || transactions.length === 0) return null;
+
+    const expenses = transactions.filter(t => t.type === 'expense');
+    const income = transactions.filter(t => t.type === 'income');
+
+    // Calculate totals by category
+    const categoryTotals = {};
+    expenses.forEach(t => {
+      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+    });
+
+    // Find top merchants
+    const merchantTotals = {};
+    expenses.forEach(t => {
+      merchantTotals[t.description] = (merchantTotals[t.description] || 0) + t.amount;
+    });
+
+    // Get top 20 merchants
+    const topMerchants = Object.entries(merchantTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([merchant, amount]) => `${merchant}: £${amount.toFixed(2)}`);
+
+    // Get all coffee-related transactions
+    const coffeeKeywords = ['coffee', 'cafe', 'pret', 'costa', 'starbucks', 'nero', 'greggs', 'caffe'];
+    const coffeeTransactions = expenses.filter(t => 
+      coffeeKeywords.some(keyword => t.description.toLowerCase().includes(keyword))
+    );
+    const coffeeTotal = coffeeTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    // Date range
+    const dates = transactions.map(t => t.date).sort();
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+
+    return {
+      totalExpenses: expenses.reduce((sum, t) => sum + t.amount, 0),
+      totalIncome: income.reduce((sum, t) => sum + t.amount, 0),
+      transactionCount: transactions.length,
+      expenseCount: expenses.length,
+      incomeCount: income.length,
+      dateRange: `${startDate} to ${endDate}`,
+      categoryBreakdown: categoryTotals,
+      topMerchants: topMerchants,
+      coffeeSpending: {
+        total: coffeeTotal,
+        count: coffeeTransactions.length,
+        transactions: coffeeTransactions.slice(0, 10).map(t => `${t.date}: ${t.description} - £${t.amount.toFixed(2)}`)
+      }
+    };
+  }, [transactions]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -33,7 +87,7 @@ export default function Chatbot({ transactions }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: userMsg, 
-          context: transactions.slice(0, 100) // Send first 100 to save tokens, or summarize logic
+          context: transactionSummary // Send structured summary
         }),
       });
 
@@ -43,7 +97,10 @@ export default function Chatbot({ transactions }) {
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I couldn't reach the AI server." }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: "Sorry, I couldn't reach the AI server. Please try again." 
+      }]);
     } finally {
       setLoading(false);
     }
