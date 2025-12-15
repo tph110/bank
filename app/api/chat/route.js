@@ -10,9 +10,6 @@ export async function POST(req) {
       return NextResponse.json({ error: "Server Error: API Key missing" }, { status: 500 });
     }
 
-    // ✅ CRITICAL FIX: The model name might be incorrect or the free tier might have issues
-    // Let's try with a fallback model and better error handling
-    
     console.log("📤 Attempting OpenRouter API call...");
     console.log("📊 Context items:", context?.length || 0);
     console.log("💬 Message length:", message?.length || 0);
@@ -26,8 +23,8 @@ export async function POST(req) {
         "X-Title": "OnlyBanks",
       },
       body: JSON.stringify({
-        // ✅ FIX 1: Try the stable model name format
-        model: "google/gemini-2.0-flash-exp:free",
+        // ✅ CHANGED: Using Meta Llama instead of Gemini (more reliable free tier)
+        model: "meta-llama/llama-3.2-3b-instruct:free",
         messages: [
           {
             role: "system",
@@ -41,12 +38,8 @@ export async function POST(req) {
           },
           { role: "user", content: message }
         ],
-        // ✅ FIX 2: Add these parameters for better compatibility
         temperature: 0.7,
         max_tokens: 500,
-        top_p: 1,
-        frequency_penalty: 0,
-        presence_penalty: 0
       })
     });
 
@@ -56,7 +49,6 @@ export async function POST(req) {
       const errorText = await response.text();
       console.error("❌ OpenRouter Error Details:", errorText);
       
-      // Parse the error to provide helpful feedback
       let errorJson;
       try {
         errorJson = JSON.parse(errorText);
@@ -64,17 +56,21 @@ export async function POST(req) {
         console.error("Could not parse error JSON");
       }
 
-      // Log the full error for debugging
       console.error("Full error:", {
         status: response.status,
         statusText: response.statusText,
         body: errorText
       });
 
-      // Return user-friendly error
+      // Handle 429 rate limit with user-friendly message
+      if (response.status === 429) {
+        return NextResponse.json({ 
+          error: "The AI is experiencing high traffic. Please try again in a moment.",
+        }, { status: 429 });
+      }
+
       return NextResponse.json({ 
-        error: `OpenRouter API error (${response.status}): ${errorJson?.error?.message || errorText.substring(0, 100)}`,
-        technicalDetails: process.env.NODE_ENV === 'development' ? errorText : undefined
+        error: `AI service error (${response.status}). Please try again.`,
       }, { status: 500 });
     }
 
@@ -91,7 +87,6 @@ export async function POST(req) {
     
     return NextResponse.json({ 
       error: "I'm having trouble connecting to the AI right now. Please try again later.",
-      technicalDetails: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
   }
 }
