@@ -32,13 +32,13 @@ const renderActiveShape = (props) => {
   
   return (
     <g>
-      <text x={cx} y={cy - 10} dy={8} textAnchor="middle" fill={fill} className="font-bold text-lg">
+      <text x={cx} y={cy - 15} dy={8} textAnchor="middle" fill={fill} className="font-bold text-xl">
         {payload.name}
       </text>
-      <text x={cx} y={cy + 10} dy={8} textAnchor="middle" fill="#666" className="text-sm">
+      <text x={cx} y={cy + 5} dy={8} textAnchor="middle" fill="#666" className="text-base font-semibold">
         £{value.toFixed(2)}
       </text>
-      <text x={cx} y={cy + 30} dy={8} textAnchor="middle" fill="#999" className="text-xs">
+      <text x={cx} y={cy + 30} dy={8} textAnchor="middle" fill="#999" className="text-sm">
         {((value / props.totalValue) * 100).toFixed(1)}%
       </text>
       <Sector
@@ -236,7 +236,7 @@ export default function Home() {
 
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              {/* ✅ IMPROVED: Interactive Pie Chart */}
+              {/* ✅ IMPROVED: Larger Interactive Pie Chart, No Tooltip, No Legend */}
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
                 <h3 className="text-lg font-bold text-slate-800 mb-2">Spending Breakdown</h3>
                 <p className="text-xs text-slate-500 mb-4">Hover over segments for details</p>
@@ -249,8 +249,8 @@ export default function Home() {
                         data={pieData} 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius={60}
-                        outerRadius={90}
+                        innerRadius={84}
+                        outerRadius={126}
                         fill="#8884d8" 
                         dataKey="value"
                         onMouseEnter={onPieEnter}
@@ -265,21 +265,6 @@ export default function Home() {
                           />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        formatter={(value) => `£${value.toFixed(2)}`}
-                        contentStyle={{ 
-                          borderRadius: '12px', 
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                          padding: '12px'
-                        }}
-                      />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36}
-                        wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                        iconType="circle"
-                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
