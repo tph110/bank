@@ -23,8 +23,8 @@ export async function POST(req) {
         "X-Title": "OnlyBanks",
       },
       body: JSON.stringify({
-        // ✅ CHANGED: Using Meta Llama instead of Gemini (more reliable free tier)
-        model: "meta-llama/llama-3.2-3b-instruct:free",
+        // ✅ 
+        model: "meta-llama/llama-3.2-3b-instruct",
         messages: [
           {
             role: "system",
