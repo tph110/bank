@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { generateInsights } from '../utils/moneyHelper';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
 
 // Dynamic Imports
 const FileUploader = dynamic(() => import('../components/FileUploader'), {
@@ -18,13 +18,50 @@ const Chatbot = dynamic(() => import('../components/Chatbot'), {
   ssr: false 
 });
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c', '#d084d8', '#ff6b9d'];
 
 const CATEGORIES = [
   'Groceries', 'Eating out', 'Transport', 'Shopping', 'Bills & Utilities',
   'Tax', 'Insurance & Professional', 'Business Services', 'Health & Wellbeing',
   'Subscriptions', 'Transfers', 'Other'
 ];
+
+// ✅ Custom Active Shape for Interactive Pie Chart
+const renderActiveShape = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, value } = props;
+  
+  return (
+    <g>
+      <text x={cx} y={cy - 10} dy={8} textAnchor="middle" fill={fill} className="font-bold text-lg">
+        {payload.name}
+      </text>
+      <text x={cx} y={cy + 10} dy={8} textAnchor="middle" fill="#666" className="text-sm">
+        £{value.toFixed(2)}
+      </text>
+      <text x={cx} y={cy + 30} dy={8} textAnchor="middle" fill="#999" className="text-xs">
+        {((value / props.totalValue) * 100).toFixed(1)}%
+      </text>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 10}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        innerRadius={outerRadius + 12}
+        outerRadius={outerRadius + 16}
+        fill={fill}
+      />
+    </g>
+  );
+};
 
 export default function Home() {
   const [transactions, setTransactions] = useState([]);
@@ -36,6 +73,9 @@ export default function Home() {
   const [filterAmountMax, setFilterAmountMax] = useState('');
   const [budgets, setBudgets] = useState({});
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  
+  // ✅ State for Interactive Pie Chart
+  const [activeIndex, setActiveIndex] = useState(0);
   
   // State for Collapsible Sections
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
@@ -99,6 +139,11 @@ export default function Home() {
     return Object.entries(grouped).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [filteredTransactions]);
 
+  // ✅ Calculate total for percentage display
+  const totalPieValue = useMemo(() => {
+    return pieData.reduce((sum, entry) => sum + entry.value, 0);
+  }, [pieData]);
+
   const downloadCSV = () => {
     if (filteredTransactions.length === 0) return;
     const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
@@ -128,6 +173,11 @@ export default function Home() {
     setFilterAmountMax('');
   };
 
+  // ✅ Handle pie chart hover
+  const onPieEnter = (_, index) => {
+    setActiveIndex(index);
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
@@ -152,7 +202,7 @@ export default function Home() {
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-500 flex-shrink-0">
               <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
             </svg>
-            <span className="font-medium">None of your personal information will leave your device. Only transaction data is extracted and analysed.</span>
+            <span className="font-medium">No personal information will leave your device. Only transaction data is extracted and analysed.</span>
           </div>
           <div className="mt-8"><FileUploader onDataParsed={handleDataParsed} /></div>
         </section>
@@ -186,21 +236,55 @@ export default function Home() {
 
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[400px] flex flex-col">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 sm:mb-6">Spending Breakdown</h3>
-                <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
+              {/* ✅ IMPROVED: Interactive Pie Chart */}
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Spending Breakdown</h3>
+                <p className="text-xs text-slate-500 mb-4">Hover over segments for details</p>
+                <div className="flex-1 w-full min-h-[280px] sm:min-h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value"
-                        label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
-                        {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                      <Pie 
+                        activeIndex={activeIndex}
+                        activeShape={(props) => renderActiveShape({...props, totalValue: totalPieValue})}
+                        data={pieData} 
+                        cx="50%" 
+                        cy="50%" 
+                        innerRadius={60}
+                        outerRadius={90}
+                        fill="#8884d8" 
+                        dataKey="value"
+                        onMouseEnter={onPieEnter}
+                        animationBegin={0}
+                        animationDuration={800}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]}
+                            className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                          />
+                        ))}
                       </Pie>
-                      <Tooltip formatter={(value) => `£${value.toFixed(2)}`} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                      <Tooltip 
+                        formatter={(value) => `£${value.toFixed(2)}`}
+                        contentStyle={{ 
+                          borderRadius: '12px', 
+                          border: '1px solid #e2e8f0',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          padding: '12px'
+                        }}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                        iconType="circle"
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               </div>
+              
               <div className="bg-gradient-to-br from-indigo-50 to-white p-4 sm:p-6 rounded-2xl border border-indigo-100 shadow-sm flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="bg-indigo-600 text-white p-1.5 rounded-lg text-sm">💡</span>
