@@ -236,7 +236,7 @@ export default function Home() {
 
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              {/* ✅ IMPROVED: Larger Interactive Pie Chart, No Tooltip, No Legend */}
+              {/* ✅ IMPROVED: 30% Larger Pie Chart (109.2, 163.8) */}
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
                 <h3 className="text-lg font-bold text-slate-800 mb-2">Spending Breakdown</h3>
                 <p className="text-xs text-slate-500 mb-4">Hover over segments for details</p>
@@ -249,8 +249,8 @@ export default function Home() {
                         data={pieData} 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius={84}
-                        outerRadius={126}
+                        innerRadius={109}
+                        outerRadius={164}
                         fill="#8884d8" 
                         dataKey="value"
                         onMouseEnter={onPieEnter}
