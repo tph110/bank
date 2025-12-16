@@ -60,7 +60,6 @@ const parseMonzoStatement = (lines) => {
 // ✅ 3. PARSER FOR SANTANDER
 const parseSantanderStatement = (lines) => {
   const transactions = [];
-  // Greedy match (.*) finds the LAST amount
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
@@ -105,23 +104,20 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (Polished)
+// ✅ 4. PARSER FOR BARCLAYS
 const parseBarclaysStatement = (rawText) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   const currentYear = new Date().getFullYear();
 
-  // 1. Normalize text
   const blob = rawText.replace(/\s+/g, ' ');
 
-  // 2. Find Start Balance
   let lastBalance = 0;
   const startBalMatch = blob.match(/(?:Start Balance|Balance brought forward)[^0-9]*?((?:\d{1,3},)*\d{1,3}\.\d{2})/i);
   if (startBalMatch) {
     lastBalance = parseFloat(startBalMatch[1].replace(/,/g, ''));
   }
 
-  // 3. Regex to find "Amount Balance" pairs
   const regex = /((?:\d{1,3},)*\d{1,3}\.\d{2})\s+((?:\d{1,3},)*\d{1,3}\.\d{2})/g;
   
   let match;
@@ -134,30 +130,24 @@ const parseBarclaysStatement = (rawText) => {
     const amount = parseFloat(amountStr.replace(/,/g, ''));
     const balance = parseFloat(balanceStr.replace(/,/g, ''));
 
-    // 4. Mathematical Validation
     const diff = balance - lastBalance;
     const isValid = Math.abs(Math.abs(diff) - amount) < 0.05;
 
     if (isValid && amount > 0) {
       const isIncome = diff > 0;
 
-      // Extract Description & Date
-      // Look back ~250 chars
       const lookbackStart = Math.max(lastIndex, match.index - 250);
       let descChunk = blob.substring(lookbackStart, match.index).trim();
 
-      // Find Date
       const dateMatch = descChunk.match(/(\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))/i);
       if (dateMatch) {
         const [_, dateStr] = dateMatch;
         const [day, monthAbbr] = dateStr.split(' ');
         const month = monthMap[monthAbbr.charAt(0).toUpperCase() + monthAbbr.slice(1).toLowerCase()];
         currentDate = `${currentYear}-${month}-${day.padStart(2, '0')}`;
-        // Remove date from description
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
-      // 🧹 CLEANUP
       let cleanDesc = descChunk
         .replace(/Date Description/gi, '')
         .replace(/(?:Money out|ut) £ (?:Money in|in) £ (?:Balance|ance) £/gi, '') 
@@ -230,7 +220,6 @@ export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
 
-  // Pre-process
   let cleaned = rawText
     .replace(/\s+/g, ' ')
     .replace(/(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3}\s+(\d{4})?)/g, '\n$1') 
@@ -272,50 +261,29 @@ export const parseStatement = (rawText, pageCount) => {
   
   return data.map(t => ({
     ...t,
-    category: categoriseTransaction(t.description, t.type) // ✅ UPDATED: Pass t.type
+    category: categoriseTransaction(t.description, t.type)
   }));
 };
 
-// ✅ 7. CATEGORISATION (MASSIVELY UPGRADED) 
-export const categoriseTransaction = (description, type) => { // ✅ UPDATED: Added 'type'
+// ✅ 7. CATEGORISATION
+export const categoriseTransaction = (description, type) => {
   const desc = description.toLowerCase().trim();
   
-  // 1. Explicitly categorize actual income transactions
   if (type === 'income') {
     return 'Income';
   }
   
-  // 2. EXPENSE RULES (Only run if it's not an income transaction)
   const rules = [
-    // 1. BILLS & UTILITIES (New)
     { keywords: ['british gas', 'edf', 'e.on', 'octopus', 'scottish power', 'bulb', 'shell energy', 'utilita', 'ovo', 'water', 'council tax', 'wod ct', 'ct dd', 'telecom', 'bt', 'sky', 'virgin media', 'talktalk', 'ee limited', 'ee ltd', 'vodafone', 'o2', 'three', 'plusnet', 'mobile'], category: 'Bills & Utilities' },
-    
-    // 2. TAX & INSURANCE (New)
     { keywords: ['hmrc', 'tax', 'vat', 'national insurance'], category: 'Tax' },
     { keywords: ['admiral', 'aviva', 'direct line', 'hastings', 'churchill', 'axa', 'insurance', 'cover', 'protect', 'mddus', 'mdu', 'mps'], category: 'Insurance & Professional' },
-
-    // 3. BUSINESS SERVICES (New)
     { keywords: ['stripe', 'gocardless', 'izettle', 'sumup', 'paypal', 'restore datashred', 'ico', 'companies house', 'xero', 'quickbooks', 'sage', 'iris payroll', 'iris business', 'aws', 'google cloud', 'slack', 'zoom', 'microsoft'], category: 'Business Services' },
-
-    // 4. GROCERIES
     { keywords: ['tesco', 'sainsbury', 'aldi', 'waitrose', 'co-op', 'coop', 'ocado', 'asda', 'lidl', 'morrisons', 'm&s', 'iceland', 'farmfoods', 'whole foods'], category: 'Groceries' },
-    
-    // 5. EATING OUT
-    { keywords: ['pret', 'costa', 'starbucks', 'greggs', 'mcdonald', 'burger king', 'nando', 'deliveroo', 'just eat', 'uber eats', 'cafe', 'coffee', 'kfc', 'subway', 'pizza', 'restaurant', ' bar ', 'pub', 'wetherspoon'], category: 'Eating out' }, // ✅ FIX: Added spaces around ' bar '
-    
-    // 6. SHOPPING
+    { keywords: ['pret', 'costa', 'starbucks', 'greggs', 'mcdonald', 'burger king', 'nando', 'deliveroo', 'just eat', 'uber eats', 'cafe', 'coffee', 'kfc', 'subway', 'pizza', 'restaurant', ' bar ', 'pub', 'wetherspoon'], category: 'Eating out' },
     { keywords: ['amazon', 'amzn', 'argos', 'boots', 'superdrug', 'whsmith', 'next', 'zara', 'asos', 'temu', 'shein', 'ikea', 'primark', 'ebay', 'shopify', 'currys', 'john lewis', 'tk maxx', 'decathlon', 'sports direct'], category: 'Shopping' },
-    
-    // 7. TRANSPORT (UPDATED: "petrol station" added first for priority matching)
     { keywords: ['petrol station', 'petrol', 'fuel', 'shell', 'bp', 'esso', 'texaco', 'trainline', 'tfl', 'transport for london', 'uber', 'bolt', 'taxi', 'parking', 'garage', 'gwr', 'rail', 'train', 'ticket', 'stagecoach', 'arriva', 'first bus', 'go ahead'], category: 'Transport' },
-    
-    // 8. HEALTH & WELLBEING (Expanded)
     { keywords: ['pharmacy', 'dentist', 'gym', 'fitness', 'sport', 'puregym', 'doctor', 'medical', 'hospital', 'optician', 'boots opticians', 'specsavers', 'holland & barrett', 'aventis', 'boc', 'primary care'], category: 'Health & Wellbeing' },
-    
-    // 9. SUBSCRIPTIONS
     { keywords: ['netflix', 'spotify', 'disney', 'prime', 'apple', 'klarna', 'hbo', 'youtube', 'audible', 'playstation', 'xbox', 'nintendo', 'news'], category: 'Subscriptions' },
-    
-    // 10. TRANSFERS
     { keywords: ['chase saver', 'rewards', 'transfer', 'savings', 'invest', 'trading 212', 'vanguard', 'hargreaves', 'moneybox', 'plum'], category: 'Transfers' },
   ];
 
@@ -326,20 +294,98 @@ export const categoriseTransaction = (description, type) => { // ✅ UPDATED: Ad
   return 'Other';
 };
 
-// ✅ 8. INSIGHTS
-export const generateInsights = (transactions) => {
+// ✅ 8. AI-POWERED INSIGHTS (NEW!)
+export const generateInsights = async (transactions) => {
   const expenses = transactions.filter(t => t.type === 'expense');
+  const income = transactions.filter(t => t.type === 'income');
+  
   if (expenses.length === 0) return ['No expenses found in this period.'];
 
-  const insights = [];
+  // Calculate summary statistics
+  const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
+  const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
   
-  const coffee = expenses.filter(t => t.category === 'Eating out' && /coffee|cafe|pret|costa|starbucks/i.test(t.description)).reduce((s, t) => s + t.amount, 0);
-  if (coffee > 20) insights.push(`☕ You spent £${coffee.toFixed(2)} on coffee this month.`);
+  const categoryTotals = {};
+  expenses.forEach(t => {
+    categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+  });
+  
+  const topCategories = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
   const largest = expenses.reduce((max, t) => t.amount > max.amount ? t : max, { amount: 0 });
-  if (largest.amount > 50) insights.push(`⚠️ Largest expense: £${largest.amount.toFixed(2)} at ${largest.description}`);
 
-  insights.push(`🛡️ Your UK deposits are protected by the FSCS up to £85,000.`);
+  // Get date range
+  const dates = transactions.map(t => t.date).sort();
+  const dateRange = dates.length > 0 ? `${dates[0]} to ${dates[dates.length - 1]}` : 'Recent';
+
+  // ✅ Call AI for insights
+  try {
+    console.log('🤖 Calling AI for insights...');
+    
+    const response = await fetch('/api/generate-insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        totalSpent,
+        totalIncome,
+        topCategories,
+        largestExpense: largest,
+        transactionCount: expenses.length,
+        dateRange
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI insights failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.insights && data.insights.length > 0) {
+      console.log('✅ AI insights generated successfully');
+      return data.insights;
+    } else {
+      throw new Error('No insights returned from AI');
+    }
+  } catch (error) {
+    console.error('❌ AI insights failed, using fallback:', error.message);
+    return getFallbackInsights(expenses, totalSpent, totalIncome, categoryTotals, largest);
+  }
+};
+
+// Fallback to simple rules if AI fails
+const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, largest) => {
+  const insights = [];
   
-  return insights;
+  // Coffee spending
+  const coffee = expenses
+    .filter(t => /coffee|cafe|pret|costa|starbucks/i.test(t.description))
+    .reduce((s, t) => s + t.amount, 0);
+  if (coffee > 20) {
+    insights.push(`☕ You spent £${coffee.toFixed(2)} on coffee this month.`);
+  }
+
+  // Savings rate
+  if (totalIncome > 0) {
+    const savingsRate = ((totalIncome - totalSpent) / totalIncome * 100).toFixed(0);
+    if (savingsRate > 0) {
+      insights.push(`💰 You're saving ${savingsRate}% of your income.`);
+    }
+  }
+
+  // Largest expense
+  if (largest.amount > 50) {
+    insights.push(`⚠️ Largest expense: £${largest.amount.toFixed(2)} at ${largest.description}`);
+  }
+
+  // Top category
+  const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  if (topCategory) {
+    const percentage = (topCategory[1] / totalSpent * 100).toFixed(0);
+    insights.push(`🎯 ${topCategory[0]} is ${percentage}% of your spending.`);
+  }
+
+  return insights.length > 0 ? insights : ['💡 Upload more transactions for better insights.'];
 };
