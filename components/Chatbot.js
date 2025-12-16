@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 
 export default function Chatbot({ transactions }) {
-  const [isOpen, setIsOpen] = useState(false);
+  // ✅ CHANGED: Set to true by default so chatbot is open on load
+  const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Hi! I have analyzed your statement. Ask me anything about your spending!' }
   ]);
@@ -113,11 +114,11 @@ export default function Chatbot({ transactions }) {
       {isOpen && (
         <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-80 sm:w-96 mb-4 pointer-events-auto flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-200">
           
-          {/* Header */}
+          {/* ✅ CHANGED: Updated header title */}
           <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
             <div className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
-              <h3 className="font-bold">OnlyBanks AI</h3>
+              <h3 className="font-bold text-sm sm:text-base">OnlyBanks AI Account Bot</h3>
             </div>
             <button onClick={() => setIsOpen(false)} className="hover:bg-blue-700 p-1 rounded">✕</button>
           </div>
