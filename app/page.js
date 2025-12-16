@@ -236,10 +236,9 @@ export default function Home() {
 
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              {/* ✅ IMPROVED: 30% Larger Pie Chart (109.2, 163.8) */}
+              {/* ✅ CHANGED: Decreased by 10% (109 × 0.9 = 98, 164 × 0.9 = 148) and removed subtitle */}
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
-                <h3 className="text-lg font-bold text-slate-800 mb-2">Spending Breakdown</h3>
-                <p className="text-xs text-slate-500 mb-4">Hover over segments for details</p>
+                <h3 className="text-lg font-bold text-slate-800 mb-6">Spending Breakdown</h3>
                 <div className="flex-1 w-full min-h-[280px] sm:min-h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -249,8 +248,8 @@ export default function Home() {
                         data={pieData} 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius={109}
-                        outerRadius={164}
+                        innerRadius={98}
+                        outerRadius={148}
                         fill="#8884d8" 
                         dataKey="value"
                         onMouseEnter={onPieEnter}
