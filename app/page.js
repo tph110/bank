@@ -66,6 +66,7 @@ const renderActiveShape = (props) => {
 export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [insightsLoading, setInsightsLoading] = useState(false); // ✅ NEW: Loading state
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -81,9 +82,22 @@ export default function Home() {
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
   const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
-  const handleDataParsed = (data) => {
+  // ✅ UPDATED: Async insights generation
+  const handleDataParsed = async (data) => {
     setTransactions(data);
-    setInsights(generateInsights(data));
+    setInsightsLoading(true);
+    
+    // Generate AI insights (async)
+    try {
+      const aiInsights = await generateInsights(data);
+      setInsights(aiInsights);
+    } catch (error) {
+      console.error('Failed to generate insights:', error);
+      setInsights(['💡 Unable to generate insights. Please try again.']);
+    } finally {
+      setInsightsLoading(false);
+    }
+    
     const savedBudgets = localStorage.getItem('categoryBudgets');
     if (savedBudgets) setBudgets(JSON.parse(savedBudgets));
   };
@@ -236,7 +250,7 @@ export default function Home() {
 
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-              {/* ✅ CHANGED: Decreased by 10% (109 × 0.9 = 98, 164 × 0.9 = 148) and removed subtitle */}
+              {/* Pie Chart */}
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
                 <h3 className="text-lg font-bold text-slate-800 mb-6">Spending Breakdown</h3>
                 <div className="flex-1 w-full min-h-[280px] sm:min-h-[350px]">
@@ -269,18 +283,38 @@ export default function Home() {
                 </div>
               </div>
               
+              {/* ✅ UPDATED: AI Smart Insights with loading state */}
               <div className="bg-gradient-to-br from-indigo-50 to-white p-4 sm:p-6 rounded-2xl border border-indigo-100 shadow-sm flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="bg-indigo-600 text-white p-1.5 rounded-lg text-sm">💡</span>
+                  <span className="bg-indigo-600 text-white p-1.5 rounded-lg text-sm">🤖</span>
                   <h3 className="text-lg font-bold text-indigo-900">AI Smart Insights</h3>
+                  {insightsLoading && (
+                    <div className="ml-auto flex items-center gap-2 text-xs text-indigo-600">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div>
+                      <span>Analyzing...</span>
+                    </div>
+                  )}
                 </div>
-                <ul className="space-y-3">
-                  {insights.map((insight, i) => (
-                    <li key={i} className="flex items-start gap-3 text-indigo-800 text-sm font-medium bg-white/60 p-3 rounded-lg border border-indigo-50/50">
-                      <span className="text-indigo-500 mt-0.5">•</span> {insight}
-                    </li>
-                  ))}
-                </ul>
+                
+                {insightsLoading ? (
+                  <div className="space-y-3 animate-pulse">
+                    <div className="h-16 bg-indigo-100/60 rounded-lg"></div>
+                    <div className="h-16 bg-indigo-100/60 rounded-lg"></div>
+                    <div className="h-16 bg-indigo-100/60 rounded-lg"></div>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {insights.map((insight, i) => (
+                      <li 
+                        key={i} 
+                        className="flex items-start gap-3 text-indigo-800 text-sm font-medium bg-white/60 p-3 rounded-lg border border-indigo-50/50 animate-in fade-in slide-in-from-left duration-300"
+                        style={{ animationDelay: `${i * 100}ms` }}
+                      >
+                        <span className="text-indigo-500 mt-0.5">•</span> {insight}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
