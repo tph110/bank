@@ -66,7 +66,7 @@ const renderActiveShape = (props) => {
 export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [insights, setInsights] = useState([]);
-  const [insightsLoading, setInsightsLoading] = useState(false); // ✅ NEW: Loading state
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -75,14 +75,22 @@ export default function Home() {
   const [budgets, setBudgets] = useState({});
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   
-  // ✅ State for Interactive Pie Chart
+  // State for Interactive Pie Chart
   const [activeIndex, setActiveIndex] = useState(0);
   
   // State for Collapsible Sections
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
   const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
-  // ✅ UPDATED: Async insights generation
+  // ✅ NEW: Function to update transaction category
+  const updateTransactionCategory = (transactionId, newCategory) => {
+    setTransactions(prevTransactions => 
+      prevTransactions.map(t => 
+        t.id === transactionId ? { ...t, category: newCategory } : t
+      )
+    );
+  };
+
   const handleDataParsed = async (data) => {
     setTransactions(data);
     setInsightsLoading(true);
@@ -153,7 +161,6 @@ export default function Home() {
     return Object.entries(grouped).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [filteredTransactions]);
 
-  // ✅ Calculate total for percentage display
   const totalPieValue = useMemo(() => {
     return pieData.reduce((sum, entry) => sum + entry.value, 0);
   }, [pieData]);
@@ -187,7 +194,6 @@ export default function Home() {
     setFilterAmountMax('');
   };
 
-  // ✅ Handle pie chart hover
   const onPieEnter = (_, index) => {
     setActiveIndex(index);
   };
@@ -283,7 +289,7 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* ✅ UPDATED: AI Smart Insights with loading state */}
+              {/* AI Smart Insights */}
               <div className="bg-gradient-to-br from-indigo-50 to-white p-4 sm:p-6 rounded-2xl border border-indigo-100 shadow-sm flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="bg-indigo-600 text-white p-1.5 rounded-lg text-sm">🤖</span>
@@ -353,7 +359,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Budget Section (Collapsible) */}
+            {/* Budget Section */}
             {budgetData.length > 0 && (
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
                 <div className="flex justify-between items-center cursor-pointer select-none" onClick={() => setIsBudgetExpanded(!isBudgetExpanded)}>
@@ -386,7 +392,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Monthly Trend (Collapsible + Line Chart) */}
+            {/* Monthly Trend */}
             {monthlyData.length > 1 && (
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300">
                 <div className="flex justify-between items-center cursor-pointer select-none" onClick={() => setIsTrendExpanded(!isTrendExpanded)}>
@@ -433,7 +439,16 @@ export default function Home() {
                         <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-mono">{t.date}</td>
                         <td className="p-4 text-slate-800 text-sm font-medium truncate max-w-xs">{t.description}</td>
                         <td className="p-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${t.category === 'Income' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{t.category}</span>
+                          {/* ✅ EDITABLE CATEGORY DROPDOWN */}
+                          <select 
+                            value={t.category}
+                            onChange={(e) => updateTransactionCategory(t.id, e.target.value)}
+                            className="text-xs font-medium border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-blue-400 transition-colors cursor-pointer"
+                          >
+                            {CATEGORIES.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className={`p-4 text-right text-sm font-mono font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>{t.type === 'income' ? '+' : ''}£{t.amount.toFixed(2)}</td>
                       </tr>
@@ -441,12 +456,41 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
+
+              {/* ✅ MOBILE VIEW WITH EDITABLE CATEGORIES */}
+              <div className="sm:hidden divide-y divide-slate-100">
+                {filteredTransactions.map((t) => (
+                  <div key={t.id} className="p-4 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-800">{t.description}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-1">{t.date}</p>
+                      </div>
+                      <p className={`text-sm font-bold font-mono ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                        {t.type === 'income' ? '+' : ''}£{t.amount.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Category:</label>
+                      <select 
+                        value={t.category}
+                        onChange={(e) => updateTransactionCategory(t.id, e.target.value)}
+                        className="w-full text-xs font-medium border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modals & Overlays */}
+      {/* Budget Modal */}
       {showBudgetModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
