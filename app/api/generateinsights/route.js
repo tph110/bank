@@ -61,7 +61,7 @@ Return ONLY 3-4 insights, one per line. No numbering, no preamble, no explanatio
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ OpenRouter error:", errorText);
-      throw new Error(`OpenRouter error: ${response.status}`);
+      throw new Error(`OpenRouter error: ${response.status}`);  // ✅ FIXED THIS LINE
     }
 
     const data = await response.json();
