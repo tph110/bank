@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 export async function POST(req) {
   try {
-    const { totalSpent, totalIncome, topCategories, largestExpense, transactionCount, dateRange } = await req.json();
+    // ✅ ADDED: totalTransfers to destructuring
+    const { totalSpent, totalIncome, topCategories, largestExpense, transactionCount, dateRange, totalTransfers } = await req.json();
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
@@ -38,16 +39,24 @@ RULES:
 - Be specific with numbers and percentages
 - Be encouraging but honest
 - Avoid generic advice
+- IMPORTANT: Transfers to savings accounts are NOT expenses - they are saving!
 
 FINANCIAL DATA:
 - Period: ${dateRange || 'Recent transactions'}
-- Total Spent: £${totalSpent.toFixed(2)}
+- Total Spent: £${totalSpent.toFixed(2)} (EXCLUDES transfers to savings)
 - Total Income: £${totalIncome.toFixed(2)}
-- Savings Rate: ${savingsRate}%
+- Transfers to Savings: £${(totalTransfers || 0).toFixed(2)} (This is SAVING, not spending!)
+- Savings Rate: ${savingsRate}% (based on actual spending, not including transfers)
 - Top Spending Categories: ${topCategories.map(([cat, amt]) => `${cat} £${amt.toFixed(2)}`).join(', ')}
 - Largest Single Expense: £${largestExpense.amount.toFixed(2)} at ${largestExpense.description}
 - Transaction Count: ${transactionCount}
 - Average Transaction: £${avgTransactionSize}
+
+CONTEXT:
+- If transfers to savings are high (e.g., £1000+), PRAISE this as excellent savings discipline
+- Calculate true savings rate as: ((Income - Spent) / Income) × 100
+- Don't treat transfers as expenses or spending
+- If someone transferred £7990 to savings, they SAVED that much - celebrate it!
 
 Return ONLY 3-4 insights, one per line. No numbering, no preamble, no explanations.`
           },
@@ -61,7 +70,7 @@ Return ONLY 3-4 insights, one per line. No numbering, no preamble, no explanatio
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ OpenRouter error:", errorText);
-      throw new Error(`OpenRouter error: ${response.status}`);  // ✅ FIXED THIS LINE
+      throw new Error(`OpenRouter error: ${response.status}`);
     }
 
     const data = await response.json();
