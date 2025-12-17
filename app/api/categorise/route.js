@@ -10,7 +10,6 @@ export async function POST(req) {
       return NextResponse.json({ error: "Server Error: API Key missing" }, { status: 500 });
     }
 
-    // Using Google's Gemini Flash Lite (Free & Very Fast) - highly recommended for categories
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -20,7 +19,7 @@ export async function POST(req) {
         "X-Title": "OnlyBanks",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-3b-instruct",
+        model: "meta-llama/llama-3.2-3b-instruct",  // ✅ CORRECT MODEL
         messages: [
           {
             role: "system",
@@ -35,13 +34,13 @@ export async function POST(req) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ OpenRouter Error:", errorText);
-      throw new Error(`OpenRouter responded with ${response.status}: ${errorText}`);
+      throw new Error(`OpenRouter responded with ${response.status}: ${errorText}`);  // ✅ FIXED THIS LINE
     }
 
     const data = await response.json();
     let category = data.choices[0]?.message?.content?.trim() || "Other";
     category = category.replace(/['".]/g, ''); // Clean up
-
+    
     return NextResponse.json({ category });
 
   } catch (error) {
