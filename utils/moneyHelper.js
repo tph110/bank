@@ -294,16 +294,21 @@ export const categoriseTransaction = (description, type) => {
   return 'Other';
 };
 
-// ✅ 8. AI-POWERED INSIGHTS (NEW!)
+// ✅ 8. AI-POWERED INSIGHTS (FIXED - EXCLUDES TRANSFERS)
 export const generateInsights = async (transactions) => {
-  const expenses = transactions.filter(t => t.type === 'expense');
+  // ✅ FIXED: Exclude 'Transfers' category from expenses
+  const expenses = transactions.filter(t => 
+    t.type === 'expense' && t.category !== 'Transfers'
+  );
   const income = transactions.filter(t => t.type === 'income');
+  const transfers = transactions.filter(t => t.category === 'Transfers');
   
   if (expenses.length === 0) return ['No expenses found in this period.'];
 
-  // Calculate summary statistics
+  // Calculate summary statistics (now excluding transfers)
   const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
   const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
+  const totalTransfers = transfers.reduce((sum, t) => sum + t.amount, 0);
   
   const categoryTotals = {};
   expenses.forEach(t => {
@@ -333,7 +338,8 @@ export const generateInsights = async (transactions) => {
         topCategories,
         largestExpense: largest,
         transactionCount: expenses.length,
-        dateRange
+        dateRange,
+        totalTransfers  // ✅ ADDED: Send transfers to AI
       })
     });
 
@@ -351,13 +357,18 @@ export const generateInsights = async (transactions) => {
     }
   } catch (error) {
     console.error('❌ AI insights failed, using fallback:', error.message);
-    return getFallbackInsights(expenses, totalSpent, totalIncome, categoryTotals, largest);
+    return getFallbackInsights(expenses, totalSpent, totalIncome, categoryTotals, largest, totalTransfers);
   }
 };
 
-// Fallback to simple rules if AI fails
-const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, largest) => {
+// ✅ Fallback to simple rules if AI fails (FIXED - INCLUDES TRANSFERS INFO)
+const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, largest, totalTransfers) => {
   const insights = [];
+  
+  // Savings transfers insight
+  if (totalTransfers > 0) {
+    insights.push(`💰 You transferred £${totalTransfers.toFixed(2)} to savings this period.`);
+  }
   
   // Coffee spending
   const coffee = expenses
@@ -371,7 +382,7 @@ const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, 
   if (totalIncome > 0) {
     const savingsRate = ((totalIncome - totalSpent) / totalIncome * 100).toFixed(0);
     if (savingsRate > 0) {
-      insights.push(`💰 You're saving ${savingsRate}% of your income.`);
+      insights.push(`📊 You're saving ${savingsRate}% of your income (excluding transfers).`);
     }
   }
 
