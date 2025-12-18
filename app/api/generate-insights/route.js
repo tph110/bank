@@ -55,6 +55,7 @@ CRITICAL RULES:
 - Start each with an emoji (💰 🎯 ⚠️ 📊 💡 📈 📉 ☕ 🛒 🚗 etc.)
 - Each insight must be on a separate line
 - Be specific with numbers and percentages FROM THE DATA ONLY
+- NEVER make up numbers or amounts - only use the exact figures provided
 - Be genuinely encouraging and enthusiastic for good financial behavior
 - NEVER make up target amounts or suggest arbitrary savings goals
 - NEVER suggest saving more if savings rate is already >50%
@@ -66,7 +67,7 @@ TONE GUIDELINES:
 - Savings rate 15-30%: "Good", "Solid", "Nice work"
 - Savings rate <15%: Suggest gentle improvements with encouragement
 
-FINANCIAL DATA:
+FINANCIAL DATA (USE THESE EXACT NUMBERS ONLY):
 - Period: ${dateRange || 'Recent transactions'}
 - Total Spent: £${totalSpent.toFixed(2)} (EXCLUDES transfers to savings)
 - Total Income: £${totalIncome.toFixed(2)}
@@ -86,52 +87,52 @@ UK BENCHMARKS FOR COMPARISON:
 - UK average transport: £85/month
 
 KEY PRINCIPLES FOR GENERATING INSIGHTS:
-1. CELEBRATE HIGH SAVINGS RATES (>50%):
+1. USE ONLY THE EXACT NUMBERS PROVIDED ABOVE:
+   - When mentioning transfers, use EXACTLY £${(totalTransfers || 0).toFixed(2)}
+   - When mentioning savings rate, use EXACTLY ${savingsRate}%
+   - When mentioning spending, use EXACTLY £${totalSpent.toFixed(2)}
+   - DO NOT make up different numbers!
+
+2. CELEBRATE HIGH SAVINGS RATES (>50%):
    - If savings rate >50%, NEVER suggest saving more
    - Focus on what they're doing RIGHT
-   - Example: "Outstanding 87% savings rate - exceptional financial discipline!"
+   - Example: "Outstanding ${savingsRate}% savings rate - exceptional financial discipline!"
 
-2. ONLY COMMENT ON SIGNIFICANT CATEGORIES:
+3. ONLY COMMENT ON SIGNIFICANT CATEGORIES:
    - Only mention categories that are >£100 or >10% of spending
-   - Ignore small categories (e.g., £25/month business services is too small to mention)
-   - Example: "Groceries at £245 is well below UK average of £400 for families"
+   - Ignore small categories (e.g., £25/month is too small to mention)
 
-3. BE SPECIFIC WITH COMPARISONS:
+4. BE SPECIFIC WITH COMPARISONS:
    - Compare actual amounts to UK benchmarks
    - Explain WHY something is good or bad
-   - Example: "Coffee £31 matches UK average of £28 - well controlled"
-   - NOT: "Consider reducing X by £Y" (unless there's clear reasoning)
 
-4. IF TRANSFERS ARE HIGH (>£1000):
-   - PRAISE this strongly
-   - Example: "Transferred £7990 to savings - outstanding discipline!"
-   - NOT: "Save £1500 more" (don't add arbitrary targets)
+5. IF TRANSFERS ARE HIGH (>£1000):
+   - PRAISE this strongly using THE EXACT AMOUNT
+   - Example: "Transferred £${(totalTransfers || 0).toFixed(2)} to savings - outstanding discipline!"
 
-5. FOCUS ON PATTERNS, NOT ARBITRARY GOALS:
+6. FOCUS ON PATTERNS, NOT ARBITRARY GOALS:
    - Comment on what's working well
-   - For improvements, be specific: "Eating out £120 is above UK average £65"
-   - NOT: "Reduce to £180" (no arbitrary targets)
+   - For improvements, be specific with comparisons to benchmarks
+   - NEVER add arbitrary targets like "save £1500 more"
 
-6. AVOID ONE-OFF EXPENSES:
-   - Don't comment on single large transactions unless clearly recurring
-   - Focus on monthly recurring patterns
-
-EXAMPLE GOOD INSIGHTS (for 87% savings rate, £245 groceries, £7990 transfers):
-💰 Outstanding 87% savings rate - well above UK average of 15%!
-📊 Transferred £7990 to savings - exceptional financial discipline!
-🛒 Groceries at £245 is 39% below UK family average of £400 - excellent control!
-☕ Coffee spending £31 matches UK average perfectly - well managed!
+EXAMPLE GOOD INSIGHTS (for the provided data):
+💰 Outstanding ${savingsRate}% savings rate - well above UK average of 15%!
+📊 Transferred £${(totalTransfers || 0).toFixed(2)} to savings - exceptional financial discipline!
+🛒 Groceries spending is well controlled compared to UK averages!
+☕ Coffee spending matches UK average perfectly!
 
 EXAMPLE BAD INSIGHTS (what NOT to do):
-❌ "Consider reducing business services by £25/month to reach £180" (too specific, arbitrary target)
-❌ "Save £1500 more!" (already saving 87%, unrealistic)
-❌ "Reduce spending by 10%" (arbitrary percentage, no context)
+❌ "Transferred £7990 to savings" (when actual is £${(totalTransfers || 0).toFixed(2)})
+❌ "Consider reducing business services by £25/month to reach £180"
+❌ "Save £1500 more!" (arbitrary target)
 
-Now generate 3-4 insights. Be encouraging, data-driven, and realistic. NO numbering, NO preamble.`
+CRITICAL: You MUST use ONLY the exact numbers provided in FINANCIAL DATA above. Do not invent different amounts!
+
+Now generate 3-4 insights. Be encouraging, data-driven, and use ONLY the exact figures provided. NO numbering, NO preamble.`
           },
-          { role: "user", content: "Generate exactly 3-4 financial insights based strictly on the data provided. Be encouraging and specific." }
+          { role: "user", content: "Generate exactly 3-4 financial insights based strictly on the data provided. Use only the exact numbers given." }
         ],
-        temperature: 0.7,
+        temperature: 0.6,  // ✅ Reduced from 0.7 for more consistency with numbers
         max_tokens: 400,
       })
     });
