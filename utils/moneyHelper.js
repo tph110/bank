@@ -8,7 +8,50 @@ const HIGH_SUBSCRIPTION_SPEND = 30;
 const LARGE_EXPENSE_THRESHOLD = 50;
 const MAX_PDF_PAGES = 50;
 
-// ✅ 1. PARSER FOR CHASE
+// ✅ NEW: Helper to detect year from statement header
+const detectYear = (rawText) => {
+  const currentYear = new Date().getFullYear();
+  
+  // Look for year in common statement header patterns (first 1500 characters)
+  const header = rawText.substring(0, 1500);
+  
+  // Pattern 1: "January 2024" or "Jan 2024"
+  const monthYearMatch = header.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(202[0-9])/i);
+  if (monthYearMatch) {
+    const year = parseInt(monthYearMatch[1]);
+    console.log(`📅 Detected year from month pattern: ${year}`);
+    return year;
+  }
+  
+  // Pattern 2: "01/01/2024 to 31/01/2024" or similar date ranges
+  const dateRangeMatch = header.match(/\d{1,2}\/\d{1,2}\/(202[0-9])/);
+  if (dateRangeMatch) {
+    const year = parseInt(dateRangeMatch[1]);
+    console.log(`📅 Detected year from date range: ${year}`);
+    return year;
+  }
+  
+  // Pattern 3: "Statement period: 1 Jan 2024 - 31 Jan 2024"
+  const periodMatch = header.match(/(?:Statement|Period|From).*?\b(202[0-9])\b/i);
+  if (periodMatch) {
+    const year = parseInt(periodMatch[1]);
+    console.log(`📅 Detected year from statement period: ${year}`);
+    return year;
+  }
+  
+  // Pattern 4: Any 4-digit year (2020-2029) in header
+  const yearMatch = header.match(/\b(202[0-9])\b/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1]);
+    console.log(`📅 Detected year from header: ${year}`);
+    return year;
+  }
+  
+  console.log(`⚠️ No year detected in header, using current year: ${currentYear}`);
+  return currentYear; // Fallback to current year
+};
+
+// ✅ 1. PARSER FOR CHASE (Already includes year in transactions)
 const parseChaseStatement = (lines) => {
   const transactions = [];
   const regex = /(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(.*?)\s+(Purchase|Transfer|Refund|Payment)\s+([+-]£[\d,]*\.?\d+)\s+£[\d,]*\.?\d+/;
@@ -34,7 +77,7 @@ const parseChaseStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 2. PARSER FOR MONZO
+// ✅ 2. PARSER FOR MONZO (Already includes full date)
 const parseMonzoStatement = (lines) => {
   const transactions = [];
   const regex = /(\d{4}-\d{2}-\d{2})\s+(.+?)\s+([+-]?£?[\d,]+\.\d{2})/;
@@ -57,13 +100,12 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER
-const parseSantanderStatement = (lines) => {
+// ✅ 3. PARSER FOR SANTANDER (UPDATED: Uses detected year)
+const parseSantanderStatement = (lines, detectedYear) => {
   const transactions = [];
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
   
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-  const currentYear = new Date().getFullYear();
 
   for (const line of lines) {
     if (line.includes('Balance brought forward') || 
@@ -94,7 +136,7 @@ const parseSantanderStatement = (lines) => {
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        date: `${currentYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
+        date: `${detectedYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,  // ✅ Uses detected year
         description: description,
         amount: Math.abs(amount),
         type: isIncome ? 'income' : 'expense',
@@ -104,11 +146,10 @@ const parseSantanderStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS
-const parseBarclaysStatement = (rawText) => {
+// ✅ 4. PARSER FOR BARCLAYS (UPDATED: Uses detected year)
+const parseBarclaysStatement = (rawText, detectedYear) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-  const currentYear = new Date().getFullYear();
 
   const blob = rawText.replace(/\s+/g, ' ');
 
@@ -122,7 +163,7 @@ const parseBarclaysStatement = (rawText) => {
   
   let match;
   let lastIndex = 0;
-  let currentDate = `${currentYear}-01-01`;
+  let currentDate = `${detectedYear}-01-01`;  // ✅ Uses detected year
 
   while ((match = regex.exec(blob)) !== null) {
     const amountStr = match[1];
@@ -144,7 +185,7 @@ const parseBarclaysStatement = (rawText) => {
         const [_, dateStr] = dateMatch;
         const [day, monthAbbr] = dateStr.split(' ');
         const month = monthMap[monthAbbr.charAt(0).toUpperCase() + monthAbbr.slice(1).toLowerCase()];
-        currentDate = `${currentYear}-${month}-${day.padStart(2, '0')}`;
+        currentDate = `${detectedYear}-${month}-${day.padStart(2, '0')}`;  // ✅ Uses detected year
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
@@ -188,8 +229,8 @@ const parseBarclaysStatement = (rawText) => {
   return transactions;
 };
 
-// ✅ 5. PARSER FOR LLOYDS / HALIFAX
-const parseLloydsStatement = (lines) => {
+// ✅ 5. PARSER FOR LLOYDS / HALIFAX (UPDATED: Uses detected year)
+const parseLloydsStatement = (lines, detectedYear) => {
   const transactions = [];
   const regex = /(\d{2}\s[A-Za-z]{3}\s\d{2})\s+(.+?)\s+([+-]?£?[\d,]+\.\d{2})/;
 
@@ -203,9 +244,13 @@ const parseLloydsStatement = (lines) => {
       
       let cleanAmount = parseFloat(amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim());
       
+      // ✅ IMPROVED: Use detected year, but handle 2-digit year from statement
+      const twoDigitYear = dateParts[2];
+      const fullYear = detectedYear.toString().substring(0, 2) + twoDigitYear;  // e.g., "20" + "24" = "2024"
+      
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        date: `20${dateParts[2]}-${monthMap[dateParts[1]]}-${dateParts[0]}`,
+        date: `${fullYear}-${monthMap[dateParts[1]]}-${dateParts[0]}`,
         description: desc.trim(),
         amount: Math.abs(cleanAmount),
         type: cleanAmount < 0 ? 'expense' : 'income'
@@ -215,10 +260,13 @@ const parseLloydsStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 6. MASTER PARSER
+// ✅ 6. MASTER PARSER (UPDATED: Detects year and passes to parsers)
 export const parseStatement = (rawText, pageCount) => {
   if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
   if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
+
+  // ✅ STEP 1: Detect year from statement header
+  const detectedYear = detectYear(rawText);
 
   let cleaned = rawText
     .replace(/\s+/g, ' ')
@@ -229,24 +277,25 @@ export const parseStatement = (rawText, pageCount) => {
   let data = [];
   let bankType = '';
 
+  // ✅ STEP 2: Pass detected year to bank parsers
   if (rawText.includes('Santander') && rawText.includes('Sort Code')) {
-    data = parseSantanderStatement(lines);
+    data = parseSantanderStatement(lines, detectedYear);  // ✅ Passes year
     bankType = 'Santander';
   } 
   else if (rawText.includes('Chase') && rawText.includes('Account number')) {
-    data = parseChaseStatement(lines);
+    data = parseChaseStatement(lines);  // Chase already has year in each line
     bankType = 'Chase';
   } 
   else if (rawText.includes('Monzo') || rawText.includes('monzo.com')) {
-    data = parseMonzoStatement(lines);
+    data = parseMonzoStatement(lines);  // Monzo already has full date
     bankType = 'Monzo';
   }
   else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { 
-    data = parseBarclaysStatement(rawText); 
+    data = parseBarclaysStatement(rawText, detectedYear);  // ✅ Passes year
     bankType = 'Barclays';
   }
   else if (rawText.includes('Lloyds') || rawText.includes('Halifax')) {
-    data = parseLloydsStatement(lines);
+    data = parseLloydsStatement(lines, detectedYear);  // ✅ Passes year
     bankType = 'Lloyds/Halifax';
   }
   else {
@@ -257,7 +306,7 @@ export const parseStatement = (rawText, pageCount) => {
     throw new Error(`No transactions found in ${bankType} statement.`);
   }
 
-  console.log(`Parsed ${data.length} transactions from ${bankType}`);
+  console.log(`✅ Parsed ${data.length} transactions from ${bankType} (Year: ${detectedYear})`);
   
   return data.map(t => ({
     ...t,
@@ -265,7 +314,7 @@ export const parseStatement = (rawText, pageCount) => {
   }));
 };
 
-// ✅ 7. CATEGORISATION
+// ✅ 7. CATEGORISATION (No changes needed)
 export const categoriseTransaction = (description, type) => {
   const desc = description.toLowerCase().trim();
   
@@ -294,9 +343,8 @@ export const categoriseTransaction = (description, type) => {
   return 'Other';
 };
 
-// ✅ 8. AI-POWERED INSIGHTS (FIXED - EXCLUDES TRANSFERS)
+// ✅ 8. AI-POWERED INSIGHTS (No changes needed - already excludes transfers)
 export const generateInsights = async (transactions) => {
-  // ✅ FIXED: Exclude 'Transfers' category from expenses
   const expenses = transactions.filter(t => 
     t.type === 'expense' && t.category !== 'Transfers'
   );
@@ -305,7 +353,6 @@ export const generateInsights = async (transactions) => {
   
   if (expenses.length === 0) return ['No expenses found in this period.'];
 
-  // Calculate summary statistics (now excluding transfers)
   const totalSpent = expenses.reduce((sum, t) => sum + t.amount, 0);
   const totalIncome = income.reduce((sum, t) => sum + t.amount, 0);
   const totalTransfers = transfers.reduce((sum, t) => sum + t.amount, 0);
@@ -321,11 +368,9 @@ export const generateInsights = async (transactions) => {
 
   const largest = expenses.reduce((max, t) => t.amount > max.amount ? t : max, { amount: 0 });
 
-  // Get date range
   const dates = transactions.map(t => t.date).sort();
   const dateRange = dates.length > 0 ? `${dates[0]} to ${dates[dates.length - 1]}` : 'Recent';
 
-  // ✅ Call AI for insights
   try {
     console.log('🤖 Calling AI for insights...');
     
@@ -339,7 +384,7 @@ export const generateInsights = async (transactions) => {
         largestExpense: largest,
         transactionCount: expenses.length,
         dateRange,
-        totalTransfers  // ✅ ADDED: Send transfers to AI
+        totalTransfers
       })
     });
 
@@ -361,16 +406,13 @@ export const generateInsights = async (transactions) => {
   }
 };
 
-// ✅ Fallback to simple rules if AI fails (FIXED - INCLUDES TRANSFERS INFO)
 const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, largest, totalTransfers) => {
   const insights = [];
   
-  // Savings transfers insight
   if (totalTransfers > 0) {
     insights.push(`💰 You transferred £${totalTransfers.toFixed(2)} to savings this period.`);
   }
   
-  // Coffee spending
   const coffee = expenses
     .filter(t => /coffee|cafe|pret|costa|starbucks/i.test(t.description))
     .reduce((s, t) => s + t.amount, 0);
@@ -378,7 +420,6 @@ const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, 
     insights.push(`☕ You spent £${coffee.toFixed(2)} on coffee this month.`);
   }
 
-  // Savings rate
   if (totalIncome > 0) {
     const savingsRate = ((totalIncome - totalSpent) / totalIncome * 100).toFixed(0);
     if (savingsRate > 0) {
@@ -386,12 +427,10 @@ const getFallbackInsights = (expenses, totalSpent, totalIncome, categoryTotals, 
     }
   }
 
-  // Largest expense
   if (largest.amount > 50) {
     insights.push(`⚠️ Largest expense: £${largest.amount.toFixed(2)} at ${largest.description}`);
   }
 
-  // Top category
   const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
   if (topCategory) {
     const percentage = (topCategory[1] / totalSpent * 100).toFixed(0);
