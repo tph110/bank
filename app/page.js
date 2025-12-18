@@ -29,7 +29,7 @@ const CATEGORIES = [
   'Subscriptions', 'Transfers', 'Other'
 ];
 
-// ✅ NEW: Helper function to format date as DD/MM/YYYY
+// ✅ Helper function to format date as DD/MM/YYYY
 const formatDateUK = (dateString) => {
   // Input format: YYYY-MM-DD
   // Output format: DD/MM/YYYY
@@ -102,7 +102,7 @@ export default function Home() {
     );
   };
 
-  // ✅ NEW: Shared transaction processing logic
+  // ✅ Shared transaction processing logic
   const processTransactions = async (data) => {
     const orderedData = [...data].sort((a, b) => b.date.localeCompare(a.date));
     setTransactions(orderedData);
@@ -127,7 +127,7 @@ export default function Home() {
     await processTransactions(data);
   };
 
-  // ✅ NEW: Load demo data
+  // ✅ Load demo data
   const loadDemoData = async () => {
     await processTransactions(sampleTransactions);
     window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
@@ -192,7 +192,7 @@ export default function Home() {
     if (filteredTransactions.length === 0) return;
     const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
     const rows = filteredTransactions.map(t => [
-      formatDateUK(t.date),  // ✅ Format date as DD/MM/YYYY for CSV
+      formatDateUK(t.date),
       `"${t.description.replace(/"/g, '""')}"`, 
       t.category, 
       t.type, 
@@ -489,9 +489,14 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredTransactions.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
-                        {/* ✅ CHANGED: Format date as DD/MM/YYYY */}
+                    {filteredTransactions.map((t, index) => (
+                      <tr 
+                        key={t.id} 
+                        className={`
+                          ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'} 
+                          hover:bg-blue-100 transition-colors group
+                        `}
+                      >
                         <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-mono">{formatDateUK(t.date)}</td>
                         <td className="p-4 text-slate-800 text-sm font-medium truncate max-w-xs">{t.description}</td>
                         <td className="p-4">
@@ -499,7 +504,7 @@ export default function Home() {
                           <select 
                             value={t.category}
                             onChange={(e) => updateTransactionCategory(t.id, e.target.value)}
-                            className="text-xs font-medium border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-blue-400 transition-colors cursor-pointer"
+                            className="text-xs font-medium border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-blue-400 transition-colors cursor-pointer bg-white"
                           >
                             {CATEGORIES.map(cat => (
                               <option key={cat} value={cat}>{cat}</option>
@@ -515,12 +520,14 @@ export default function Home() {
 
               {/* ✅ MOBILE VIEW WITH EDITABLE CATEGORIES */}
               <div className="sm:hidden divide-y divide-slate-100">
-                {filteredTransactions.map((t) => (
-                  <div key={t.id} className="p-4 space-y-2">
+                {filteredTransactions.map((t, index) => (
+                  <div 
+                    key={t.id} 
+                    className={`p-4 space-y-2 ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}`}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-slate-800">{t.description}</p>
-                        {/* ✅ CHANGED: Format date as DD/MM/YYYY */}
                         <p className="text-xs text-slate-500 font-mono mt-1">{formatDateUK(t.date)}</p>
                       </div>
                       <p className={`text-sm font-bold font-mono ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
@@ -532,7 +539,7 @@ export default function Home() {
                       <select 
                         value={t.category}
                         onChange={(e) => updateTransactionCategory(t.id, e.target.value)}
-                        className="w-full text-xs font-medium border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full text-xs font-medium border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                       >
                         {CATEGORIES.map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
