@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { generateInsights } from '../utils/moneyHelper';
+import { sampleTransactions } from '../utils/sampleData';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
 
 // Dynamic Imports
@@ -82,22 +83,23 @@ export default function Home() {
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
   const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
-  // ✅ NEW: Function to update transaction category
+  // ✅ Function to update transaction category
   const updateTransactionCategory = (transactionId, newCategory) => {
-    setTransactions(prevTransactions => 
-      prevTransactions.map(t => 
+    setTransactions(prevTransactions =>
+      prevTransactions.map(t =>
         t.id === transactionId ? { ...t, category: newCategory } : t
       )
     );
   };
 
-  const handleDataParsed = async (data) => {
-    setTransactions(data);
+  // ✅ NEW: Shared transaction processing logic
+  const processTransactions = async (data) => {
+    const orderedData = [...data].sort((a, b) => b.date.localeCompare(a.date));
+    setTransactions(orderedData);
     setInsightsLoading(true);
-    
-    // Generate AI insights (async)
+
     try {
-      const aiInsights = await generateInsights(data);
+      const aiInsights = await generateInsights(orderedData);
       setInsights(aiInsights);
     } catch (error) {
       console.error('Failed to generate insights:', error);
@@ -105,9 +107,20 @@ export default function Home() {
     } finally {
       setInsightsLoading(false);
     }
-    
+
     const savedBudgets = localStorage.getItem('categoryBudgets');
     if (savedBudgets) setBudgets(JSON.parse(savedBudgets));
+  };
+
+  // ✅ Handle file upload
+  const handleDataParsed = async (data) => {
+    await processTransactions(data);
+  };
+
+  // ✅ NEW: Load demo data
+  const loadDemoData = async () => {
+    await processTransactions(sampleTransactions);
+    window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
   };
 
   const filteredTransactions = useMemo(() => {
@@ -224,11 +237,37 @@ export default function Home() {
             </svg>
             <span className="font-medium">No personal information will leave your device. Only transaction data is extracted and analysed.</span>
           </div>
-          <div className="mt-8"><FileUploader onDataParsed={handleDataParsed} /></div>
+          
+          {/* ✅ Upload Section with Demo Button */}
+          <div className="mt-8 space-y-4">
+            <FileUploader onDataParsed={handleDataParsed} />
+            
+            {/* ✅ Demo Button */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm text-slate-600">
+              <button
+                type="button"
+                onClick={loadDemoData}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 shadow-sm hover:bg-amber-100 transition-colors font-semibold"
+              >
+                <span>✨</span>
+                Try a live demo with sample data
+              </button>
+              <p className="text-xs sm:text-sm text-slate-500">No upload needed—preview charts and insights instantly.</p>
+            </div>
+          </div>
         </section>
 
         {transactions.length > 0 && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            
+            {/* ✅ Demo Indicator Banner (Optional but Recommended) */}
+            {transactions[0]?.id?.startsWith('demo_') && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 flex items-center gap-2">
+                <span>📊</span>
+                <span>You're viewing <strong>demo data</strong>. Upload your own statement for real insights.</span>
+              </div>
+            )}
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
