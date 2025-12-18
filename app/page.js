@@ -23,11 +23,19 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658'
 
 // ✅ FIXED: Added 'Income' category
 const CATEGORIES = [
-  'Income',  // ✅ Added at the top
+  'Income',
   'Groceries', 'Eating out', 'Transport', 'Shopping', 'Bills & Utilities',
   'Tax', 'Insurance & Professional', 'Business Services', 'Health & Wellbeing',
   'Subscriptions', 'Transfers', 'Other'
 ];
+
+// ✅ NEW: Helper function to format date as DD/MM/YYYY
+const formatDateUK = (dateString) => {
+  // Input format: YYYY-MM-DD
+  // Output format: DD/MM/YYYY
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+};
 
 // ✅ Custom Active Shape for Interactive Pie Chart
 const renderActiveShape = (props) => {
@@ -183,7 +191,13 @@ export default function Home() {
   const downloadCSV = () => {
     if (filteredTransactions.length === 0) return;
     const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
-    const rows = filteredTransactions.map(t => [t.date, `"${t.description.replace(/"/g, '""')}"`, t.category, t.type, t.amount.toFixed(2)]);
+    const rows = filteredTransactions.map(t => [
+      formatDateUK(t.date),  // ✅ Format date as DD/MM/YYYY for CSV
+      `"${t.description.replace(/"/g, '""')}"`, 
+      t.category, 
+      t.type, 
+      t.amount.toFixed(2)
+    ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -477,7 +491,8 @@ export default function Home() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredTransactions.map((t) => (
                       <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
-                        <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-mono">{t.date}</td>
+                        {/* ✅ CHANGED: Format date as DD/MM/YYYY */}
+                        <td className="p-4 text-slate-500 text-sm whitespace-nowrap font-mono">{formatDateUK(t.date)}</td>
                         <td className="p-4 text-slate-800 text-sm font-medium truncate max-w-xs">{t.description}</td>
                         <td className="p-4">
                           {/* ✅ EDITABLE CATEGORY DROPDOWN */}
@@ -505,7 +520,8 @@ export default function Home() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-slate-800">{t.description}</p>
-                        <p className="text-xs text-slate-500 font-mono mt-1">{t.date}</p>
+                        {/* ✅ CHANGED: Format date as DD/MM/YYYY */}
+                        <p className="text-xs text-slate-500 font-mono mt-1">{formatDateUK(t.date)}</p>
                       </div>
                       <p className={`text-sm font-bold font-mono ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                         {t.type === 'income' ? '+' : ''}£{t.amount.toFixed(2)}
