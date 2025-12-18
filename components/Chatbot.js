@@ -7,7 +7,7 @@ export default function Chatbot({ transactions }) {
   // ✅ NEW: Track if this is the first time opening (for animation)
   const [hasAnimated, setHasAnimated] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I have analyzed your statement. Ask me anything about your spending!' }
+    { role: 'assistant', content: 'Hi! I have analysed your statement. Ask me anything about your spending!' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
