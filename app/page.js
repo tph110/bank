@@ -21,7 +21,9 @@ const Chatbot = dynamic(() => import('../components/Chatbot'), {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c', '#d084d8', '#ff6b9d'];
 
+// ✅ FIXED: Added 'Income' category
 const CATEGORIES = [
+  'Income',  // ✅ Added at the top
   'Groceries', 'Eating out', 'Transport', 'Shopping', 'Bills & Utilities',
   'Tax', 'Insurance & Professional', 'Business Services', 'Health & Wellbeing',
   'Subscriptions', 'Transfers', 'Other'
@@ -260,7 +262,7 @@ export default function Home() {
         {transactions.length > 0 && (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             
-            {/* ✅ Demo Indicator Banner (Optional but Recommended) */}
+            {/* ✅ Demo Indicator Banner */}
             {transactions[0]?.id?.startsWith('demo_') && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 flex items-center gap-2">
                 <span>📊</span>
