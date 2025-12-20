@@ -229,14 +229,18 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
+      {/* ✅ FIXED: Header with clickable logo and title */}
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <a 
+            href="https://onlybanks.vercel.app" 
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
             <img src="https://raw.githubusercontent.com/tph110/bank/refs/heads/main/logo2.png" alt="OnlyBanks Logo" className="h-16 sm:h-20 w-auto object-contain" />
             <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">
               Only<span className="text-blue-600">Banks</span>
             </h1>
-          </div>
+          </a>
           <button onClick={() => window.location.reload()} className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">Reset</button>
         </div>
       </header>
