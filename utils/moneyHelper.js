@@ -1,4 +1,7 @@
-// src/utils/moneyHelper.js
+// utils/moneyHelper.js
+
+import { parseGenericStatement, calculateConfidence, validateTransactions } from './genericParser.js';
+import { ParsingError, detectPDFIssues, analyzeParsingResults } from './errorMessages.js';
 
 // Constants
 const AVG_UK_COFFEE_SPEND = 28.50;
@@ -8,7 +11,7 @@ const HIGH_SUBSCRIPTION_SPEND = 30;
 const LARGE_EXPENSE_THRESHOLD = 50;
 const MAX_PDF_PAGES = 50;
 
-// ✅ NEW: Helper to detect year from statement header
+// ✅ Helper to detect year from statement header
 const detectYear = (rawText) => {
   const currentYear = new Date().getFullYear();
   
@@ -49,6 +52,25 @@ const detectYear = (rawText) => {
   
   console.log(`⚠️ No year detected in header, using current year: ${currentYear}`);
   return currentYear; // Fallback to current year
+};
+
+// ✅ Helper to detect bank type
+const detectBankType = (rawText) => {
+  const checks = [
+    { keywords: ['Santander', 'Sort Code'], name: 'Santander' },
+    { keywords: ['Chase', 'Account number'], name: 'Chase' },
+    { keywords: ['Monzo', 'monzo.com'], name: 'Monzo' },
+    { keywords: ['BARCLAYS', 'Barclays'], name: 'Barclays' },
+    { keywords: ['Lloyds', 'Halifax'], name: 'Lloyds/Halifax' },
+  ];
+  
+  for (const check of checks) {
+    if (check.keywords.every(kw => rawText.includes(kw))) {
+      return check.name;
+    }
+  }
+  
+  return null;
 };
 
 // ✅ 1. PARSER FOR CHASE (Already includes year in transactions)
@@ -100,7 +122,7 @@ const parseMonzoStatement = (lines) => {
   return transactions;
 };
 
-// ✅ 3. PARSER FOR SANTANDER (UPDATED: Uses detected year)
+// ✅ 3. PARSER FOR SANTANDER (Uses detected year)
 const parseSantanderStatement = (lines, detectedYear) => {
   const transactions = [];
   const regex = /(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})\s+(.*)\s+((?:\d{1,3},)*\d{1,3}\.\d{2})\s+[+-]?((?:\d{1,3},)*\d{1,3}\.\d{2})/;
@@ -136,7 +158,7 @@ const parseSantanderStatement = (lines, detectedYear) => {
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
-        date: `${detectedYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,  // ✅ Uses detected year
+        date: `${detectedYear}-${monthMap[monthAbbr]}-${day.padStart(2, '0')}`,
         description: description,
         amount: Math.abs(amount),
         type: isIncome ? 'income' : 'expense',
@@ -146,7 +168,7 @@ const parseSantanderStatement = (lines, detectedYear) => {
   return transactions;
 };
 
-// ✅ 4. PARSER FOR BARCLAYS (UPDATED: Uses detected year)
+// ✅ 4. PARSER FOR BARCLAYS (Uses detected year)
 const parseBarclaysStatement = (rawText, detectedYear) => {
   const transactions = [];
   const monthMap = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
@@ -163,7 +185,7 @@ const parseBarclaysStatement = (rawText, detectedYear) => {
   
   let match;
   let lastIndex = 0;
-  let currentDate = `${detectedYear}-01-01`;  // ✅ Uses detected year
+  let currentDate = `${detectedYear}-01-01`;
 
   while ((match = regex.exec(blob)) !== null) {
     const amountStr = match[1];
@@ -185,7 +207,7 @@ const parseBarclaysStatement = (rawText, detectedYear) => {
         const [_, dateStr] = dateMatch;
         const [day, monthAbbr] = dateStr.split(' ');
         const month = monthMap[monthAbbr.charAt(0).toUpperCase() + monthAbbr.slice(1).toLowerCase()];
-        currentDate = `${detectedYear}-${month}-${day.padStart(2, '0')}`;  // ✅ Uses detected year
+        currentDate = `${detectedYear}-${month}-${day.padStart(2, '0')}`;
         descChunk = descChunk.replace(dateStr, '').trim();
       }
 
@@ -229,7 +251,7 @@ const parseBarclaysStatement = (rawText, detectedYear) => {
   return transactions;
 };
 
-// ✅ 5. PARSER FOR LLOYDS / HALIFAX (UPDATED: Uses detected year)
+// ✅ 5. PARSER FOR LLOYDS / HALIFAX (Uses detected year)
 const parseLloydsStatement = (lines, detectedYear) => {
   const transactions = [];
   const regex = /(\d{2}\s[A-Za-z]{3}\s\d{2})\s+(.+?)\s+([+-]?£?[\d,]+\.\d{2})/;
@@ -244,9 +266,8 @@ const parseLloydsStatement = (lines, detectedYear) => {
       
       let cleanAmount = parseFloat(amountStr.replace(/[£,]/g, '').replace(/−|–|—/g, '-').trim());
       
-      // ✅ IMPROVED: Use detected year, but handle 2-digit year from statement
       const twoDigitYear = dateParts[2];
-      const fullYear = detectedYear.toString().substring(0, 2) + twoDigitYear;  // e.g., "20" + "24" = "2024"
+      const fullYear = detectedYear.toString().substring(0, 2) + twoDigitYear;
       
       transactions.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -260,13 +281,30 @@ const parseLloydsStatement = (lines, detectedYear) => {
   return transactions;
 };
 
-// ✅ 6. MASTER PARSER (UPDATED: Detects year and passes to parsers)
+// ✅ 6. MASTER PARSER WITH GENERIC FALLBACK
 export const parseStatement = (rawText, pageCount) => {
-  if (pageCount > MAX_PDF_PAGES) throw new Error(`PDF too large - max ${MAX_PDF_PAGES} pages.`);
-  if (!rawText || rawText.trim().length < 50) throw new Error('PDF appears empty.');
+  console.log('🚀 Starting statement parsing...');
+  
+  // ✅ STEP 1: Check for PDF issues
+  const pdfIssues = detectPDFIssues(rawText, pageCount);
+  if (pdfIssues.length > 0) {
+    const issue = pdfIssues[0]; // Report first critical issue
+    throw new ParsingError(issue.type, issue.details);
+  }
+  
+  if (pageCount > MAX_PDF_PAGES) {
+    throw new ParsingError('PDF_TOO_LARGE', { pageCount, maxPages: MAX_PDF_PAGES });
+  }
+  
+  if (!rawText || rawText.trim().length < 50) {
+    throw new ParsingError('PDF_EMPTY', {});
+  }
 
-  // ✅ STEP 1: Detect year from statement header
+  // ✅ STEP 2: Detect year and bank type
   const detectedYear = detectYear(rawText);
+  const detectedBank = detectBankType(rawText);
+  
+  console.log(`📊 Detected bank: ${detectedBank || 'Unknown'}, Year: ${detectedYear}`);
 
   let cleaned = rawText
     .replace(/\s+/g, ' ')
@@ -275,42 +313,106 @@ export const parseStatement = (rawText, pageCount) => {
   
   const lines = cleaned.split('\n').filter(l => l.length > 20);
   let data = [];
-  let bankType = '';
+  let parserUsed = '';
+  let confidence = 0;
 
-  // ✅ STEP 2: Pass detected year to bank parsers
-  if (rawText.includes('Santander') && rawText.includes('Sort Code')) {
-    data = parseSantanderStatement(lines, detectedYear);  // ✅ Passes year
-    bankType = 'Santander';
-  } 
-  else if (rawText.includes('Chase') && rawText.includes('Account number')) {
-    data = parseChaseStatement(lines);  // Chase already has year in each line
-    bankType = 'Chase';
-  } 
-  else if (rawText.includes('Monzo') || rawText.includes('monzo.com')) {
-    data = parseMonzoStatement(lines);  // Monzo already has full date
-    bankType = 'Monzo';
-  }
-  else if (rawText.includes('BARCLAYS') || rawText.includes('Barclays')) { 
-    data = parseBarclaysStatement(rawText, detectedYear);  // ✅ Passes year
-    bankType = 'Barclays';
-  }
-  else if (rawText.includes('Lloyds') || rawText.includes('Halifax')) {
-    data = parseLloydsStatement(lines, detectedYear);  // ✅ Passes year
-    bankType = 'Lloyds/Halifax';
-  }
-  else {
-    throw new Error('Bank not recognised. Currently supporting: Chase, Monzo, Santander, Barclays, Lloyds.');
+  // ✅ STEP 3: Try bank-specific parsers
+  try {
+    if (detectedBank === 'Santander') {
+      data = parseSantanderStatement(lines, detectedYear);
+      parserUsed = 'Santander';
+    } 
+    else if (detectedBank === 'Chase') {
+      data = parseChaseStatement(lines);
+      parserUsed = 'Chase';
+    } 
+    else if (detectedBank === 'Monzo') {
+      data = parseMonzoStatement(lines);
+      parserUsed = 'Monzo';
+    }
+    else if (detectedBank === 'Barclays') { 
+      data = parseBarclaysStatement(rawText, detectedYear);
+      parserUsed = 'Barclays';
+    }
+    else if (detectedBank === 'Lloyds/Halifax') {
+      data = parseLloydsStatement(lines, detectedYear);
+      parserUsed = 'Lloyds/Halifax';
+    }
+    
+    // ✅ STEP 4: Validate bank-specific parser results
+    if (data.length > 0) {
+      data = validateTransactions(data);
+      confidence = calculateConfidence(data);
+      console.log(`✅ ${parserUsed} parser: ${data.length} transactions, confidence: ${(confidence * 100).toFixed(0)}%`);
+    }
+  } catch (error) {
+    console.warn(`⚠️ ${parserUsed} parser failed:`, error.message);
+    data = [];
   }
 
+  // ✅ STEP 5: Try generic parser as fallback
   if (data.length === 0) {
-    throw new Error(`No transactions found in ${bankType} statement.`);
+    console.log('🔄 Bank-specific parser failed or not recognized, trying generic parser...');
+    
+    try {
+      data = parseGenericStatement(rawText, detectedYear);
+      parserUsed = 'Generic';
+      
+      if (data.length > 0) {
+        data = validateTransactions(data);
+        confidence = calculateConfidence(data);
+        console.log(`✅ Generic parser: ${data.length} transactions, confidence: ${(confidence * 100).toFixed(0)}%`);
+      }
+    } catch (error) {
+      console.error('❌ Generic parser also failed:', error.message);
+    }
   }
 
-  console.log(`✅ Parsed ${data.length} transactions from ${bankType} (Year: ${detectedYear})`);
+  // ✅ STEP 6: Handle parsing failures
+  if (data.length === 0) {
+    if (detectedBank) {
+      throw new ParsingError('NO_TRANSACTIONS_FOUND', { 
+        bankType: detectedBank,
+        textSample: rawText.substring(0, 200)
+      });
+    } else {
+      // Try to detect if it might be an unsupported bank
+      const potentialBankMatch = rawText.match(/(?:Bank|Building Society|Credit Union):\s*([A-Za-z\s&]+)/i);
+      if (potentialBankMatch) {
+        throw new ParsingError('UNSUPPORTED_BANK', { 
+          bankName: potentialBankMatch[1].trim() 
+        });
+      }
+      
+      throw new ParsingError('BANK_NOT_RECOGNIZED', { 
+        detectedText: rawText.substring(0, 200) 
+      });
+    }
+  }
+
+  // ✅ STEP 7: Check parsing quality
+  if (confidence < 0.5) {
+    throw new ParsingError('GENERIC_PARSER_FAILED', { 
+      candidateLines: lines.length,
+      transactionCount: data.length,
+      confidence: confidence
+    });
+  }
+
+  // ✅ STEP 8: Analyze results and generate warnings
+  const warnings = analyzeParsingResults(data, parserUsed, confidence);
+  if (warnings.length > 0) {
+    console.warn('⚠️ Parsing warnings:', warnings);
+    // Store warnings for display (you can add this to component state)
+  }
+
+  console.log(`✅ Successfully parsed ${data.length} transactions using ${parserUsed} parser (confidence: ${(confidence * 100).toFixed(0)}%)`);
   
   return data.map(t => ({
     ...t,
-    category: categoriseTransaction(t.description, t.type)
+    category: categoriseTransaction(t.description, t.type),
+    parserUsed, // Include which parser was used (useful for debugging)
+    confidence: confidence // Include confidence score
   }));
 };
 
@@ -343,7 +445,7 @@ export const categoriseTransaction = (description, type) => {
   return 'Other';
 };
 
-// ✅ 8. AI-POWERED INSIGHTS (No changes needed - already excludes transfers)
+// ✅ 8. AI-POWERED INSIGHTS (No changes needed)
 export const generateInsights = async (transactions) => {
   const expenses = transactions.filter(t => 
     t.type === 'expense' && t.category !== 'Transfers'
