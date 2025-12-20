@@ -316,9 +316,9 @@ export default function Home() {
             {/* Charts & Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               {/* Pie Chart */}
-              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col">
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[350px] sm:min-h-[450px] flex flex-col overflow-hidden">
                 <h3 className="text-lg font-bold text-slate-800 mb-6">Spending Breakdown</h3>
-                <div className="flex-1 w-full min-h-[280px] sm:min-h-[350px]">
+                <div className="flex-1 w-full min-h-[280px] sm:min-h-[350px] max-w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie 
@@ -327,8 +327,8 @@ export default function Home() {
                         data={pieData} 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius={98}
-                        outerRadius={148}
+                        innerRadius="40%"
+                        outerRadius="65%"
                         fill="#8884d8" 
                         dataKey="value"
                         onMouseEnter={onPieEnter}
@@ -459,10 +459,10 @@ export default function Home() {
                   <span className="text-slate-400 hover:text-blue-600 text-2xl font-light">{isTrendExpanded ? '−' : '+'}</span>
                 </div>
                 {isTrendExpanded && (
-                  <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="w-full h-64 sm:h-80">
+                  <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
+                    <div className="w-full h-64 sm:h-80 max-w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                        <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                           <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `£${value}`} />
