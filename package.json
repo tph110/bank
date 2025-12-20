@@ -17,16 +17,3 @@
     "xlsx": "^0.18.5"
   }
 }
-```
-
-Just copy this entire thing and replace your current `package.json` on GitHub!
-
----
-
-## ✅ Verification
-
-After committing, Vercel should rebuild and you'll see:
-```
-Installing dependencies...
-added 1 package  // ← xlsx!
-✓ Compiled successfully
