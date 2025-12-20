@@ -241,7 +241,30 @@ export default function Home() {
               Only<span className="text-blue-600">Banks</span>
             </h1>
           </a>
-          <button onClick={() => window.location.reload()} className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">Reset</button>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="group relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Reset application"
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              strokeWidth={2} 
+              stroke="currentColor" 
+              className="w-5 h-5 text-slate-500 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
+              />
+            </svg>
+            {/* Tooltip */}
+            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              Reset
+            </span>
+          </button>
         </div>
       </header>
 
