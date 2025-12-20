@@ -1,249 +1,213 @@
 'use client';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 
 export default function Chatbot({ transactions }) {
-  // ✅ Set to true by default so chatbot is open on load
-  const [isOpen, setIsOpen] = useState(true);
-  // ✅ NEW: Track if this is the first time opening (for animation)
-  const [hasAnimated, setHasAnimated] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I have analysed your statement. Ask me anything about your spending!' }
-  ]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ NEW: Trigger animation on mount
-  useEffect(() => {
-    if (isOpen && !hasAnimated) {
-      setHasAnimated(true);
-    }
-  }, [isOpen, hasAnimated]);
+  const sendMessage = async () => {
+    if (!input.trim()) return;
 
-  // ✅ Create a smart summary of transactions for the AI
-  const transactionSummary = useMemo(() => {
-    if (!transactions || transactions.length === 0) return null;
-
-    const expenses = transactions.filter(t => t.type === 'expense');
-    const income = transactions.filter(t => t.type === 'income');
-
-    // Calculate totals by category
-    const categoryTotals = {};
-    expenses.forEach(t => {
-      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
-    });
-
-    // Find top merchants
-    const merchantTotals = {};
-    expenses.forEach(t => {
-      merchantTotals[t.description] = (merchantTotals[t.description] || 0) + t.amount;
-    });
-
-    // Get top 20 merchants
-    const topMerchants = Object.entries(merchantTotals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
-      .map(([merchant, amount]) => `${merchant}: £${amount.toFixed(2)}`);
-
-    // Get all coffee-related transactions
-    const coffeeKeywords = ['coffee', 'cafe', 'pret', 'costa', 'starbucks', 'nero', 'greggs', 'caffe'];
-    const coffeeTransactions = expenses.filter(t => 
-      coffeeKeywords.some(keyword => t.description.toLowerCase().includes(keyword))
-    );
-    const coffeeTotal = coffeeTransactions.reduce((sum, t) => sum + t.amount, 0);
-
-    // Date range
-    const dates = transactions.map(t => t.date).sort();
-    const startDate = dates[0];
-    const endDate = dates[dates.length - 1];
-
-    return {
-      totalExpenses: expenses.reduce((sum, t) => sum + t.amount, 0),
-      totalIncome: income.reduce((sum, t) => sum + t.amount, 0),
-      transactionCount: transactions.length,
-      expenseCount: expenses.length,
-      incomeCount: income.length,
-      dateRange: `${startDate} to ${endDate}`,
-      categoryBreakdown: categoryTotals,
-      topMerchants: topMerchants,
-      coffeeSpending: {
-        total: coffeeTotal,
-        count: coffeeTransactions.length,
-        transactions: coffeeTransactions.slice(0, 10).map(t => `${t.date}: ${t.description} - £${t.amount.toFixed(2)}`)
-      }
-    };
-  }, [transactions]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isOpen]);
-
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const userMsg = input.trim();
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    const userMessage = input.trim();
     setInput('');
-    setLoading(true);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
 
     try {
-      const res = await fetch('/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: userMsg, 
-          context: transactionSummary
-        }),
+        body: JSON.stringify({
+          messages: [...messages, { role: 'user', content: userMessage }],
+          transactions
+        })
       });
 
-      const data = await res.json();
+      const data = await response.json();
       
-      if (data.error) throw new Error(data.error);
-
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      if (data.error) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'Sorry, I encountered an error. Please try again.' 
+        }]);
+      } else {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: data.message 
+        }]);
+      }
     } catch (error) {
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: "Sorry, I couldn't reach the AI server. Please try again." 
+        content: 'Sorry, I encountered an error. Please try again.' 
       }]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
-      
-      {/* ✅ IMPROVED: Chat Window with Startup Animation */}
+    <>
+      {/* Pill-Shaped Chat Button */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 flex items-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 z-50 group"
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            strokeWidth={2} 
+            stroke="currentColor" 
+            className="w-5 h-5"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" 
+            />
+          </svg>
+          <span className="font-semibold text-sm sm:text-base whitespace-nowrap">
+            Chat with an AI accountant
+          </span>
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+        </button>
+      )}
+
+      {/* Chat Window */}
       {isOpen && (
-        <div className={`bg-white rounded-2xl shadow-2xl border border-slate-200 w-80 sm:w-96 mb-4 pointer-events-auto flex flex-col overflow-hidden ${
-          !hasAnimated 
-            ? 'animate-[slideInBounce_0.6s_ease-out]' 
-            : 'animate-in fade-in slide-in-from-bottom-10 duration-200'
-        }`}>
-          
-          {/* ✅ CHANGED: Updated to "AI Accountant" */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex justify-between items-center text-white shadow-md">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <span className="text-2xl">🤖</span>
-                {/* ✅ NEW: Pulsing indicator */}
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse border-2 border-white"></span>
+        <div className="fixed bottom-6 right-6 w-[95vw] sm:w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-slate-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  strokeWidth={2} 
+                  stroke="currentColor" 
+                  className="w-6 h-6"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" 
+                  />
+                </svg>
               </div>
               <div>
-                <h3 className="font-bold text-base sm:text-lg">AI Accountant</h3>
-                <p className="text-xs text-blue-100">Online • Ready to help</p>
+                <h3 className="font-bold text-base">AI Accountant</h3>
+                <p className="text-xs text-white/80">Financial insights assistant</p>
               </div>
             </div>
-            <button 
-              onClick={() => setIsOpen(false)} 
-              className="hover:bg-blue-700/50 p-2 rounded-lg transition-colors"
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
             >
-              ✕
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth={2.5} 
+                stroke="currentColor" 
+                className="w-5 h-5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 
-          {/* Messages Area */}
-          <div className="flex-1 p-4 h-80 overflow-y-auto bg-slate-50 space-y-4">
-            {messages.map((m, i) => (
-              <div 
-                key={i} 
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${
-                  i === 0 ? 'animate-[fadeInUp_0.4s_ease-out_0.3s_both]' : ''
-                }`}
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+            {messages.length === 0 && (
+              <div className="text-center text-slate-500 mt-8">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    strokeWidth={1.5} 
+                    stroke="currentColor" 
+                    className="w-8 h-8 text-blue-600"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" 
+                    />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium mb-2">Ask me anything about your finances!</p>
+                <p className="text-xs">Try: "What are my biggest expenses?" or "How can I save more?"</p>
+              </div>
+            )}
+            
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div 
-                  className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                    m.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-br-none shadow-md' 
-                      : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-800 border border-slate-200'
                   }`}
                 >
-                  {m.content}
+                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
             ))}
-            {loading && (
+            
+            {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-200 p-3 rounded-2xl rounded-bl-none text-slate-500 text-xs flex items-center gap-2">
+                <div className="bg-white border border-slate-200 rounded-2xl px-4 py-2.5">
                   <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
-                  Thinking...
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <form onSubmit={sendMessage} className="p-3 bg-white border-t border-slate-100 flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your finances..."
-              className="flex-1 border border-slate-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
-            <button 
-              type="submit" 
-              disabled={loading || !transactions.length}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full w-10 h-10 flex items-center justify-center hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
-            >
-              ➤
-            </button>
-          </form>
+          {/* Input */}
+          <div className="p-4 border-t border-slate-200 bg-white rounded-b-2xl">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                placeholder="Ask about your finances..."
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                disabled={isLoading}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || isLoading}
+                className="bg-blue-600 text-white p-2.5 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  strokeWidth={2} 
+                  stroke="currentColor" 
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`pointer-events-auto h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-          isOpen ? 'bg-slate-700 text-white rotate-90' : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-        }`}
-      >
-        {isOpen ? '✕' : '💬'}
-      </button>
-
-      {/* ✅ NEW: Custom Animation Styles */}
-      <style jsx>{`
-        @keyframes slideInBounce {
-          0% {
-            transform: translateY(100%) scale(0.8);
-            opacity: 0;
-          }
-          60% {
-            transform: translateY(-10px) scale(1.02);
-            opacity: 1;
-          }
-          80% {
-            transform: translateY(5px) scale(0.98);
-          }
-          100% {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
-    </div>
+    </>
   );
 }
