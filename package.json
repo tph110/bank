@@ -6,27 +6,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
-    "chart.js": "^4.5.1",
     "next": "16.0.8",
-    "openai": "^6.10.0",
     "pdfjs-dist": "^3.11.174",
-    "react": "19.2.1",
-    "react-chartjs-2": "^5.3.1",
-    "react-dom": "19.2.1",
-    "react-dropzone": "^14.3.8",
-    "recharts": "^3.5.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.8",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0",
+    "xlsx": "^0.18.5"
   }
 }
+```
+
+Just copy this entire thing and replace your current `package.json` on GitHub!
+
+---
+
+## ✅ Verification
+
+After committing, Vercel should rebuild and you'll see:
+```
+Installing dependencies...
+added 1 package  // ← xlsx!
+✓ Compiled successfully
