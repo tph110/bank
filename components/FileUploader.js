@@ -2,14 +2,16 @@
 import { useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { parseStatement } from '../utils/moneyHelper';
+import { formatErrorForUI, ParsingError } from '../utils/errorMessages';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export default function FileUploader({ onDataParsed }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null); // Now stores full error object
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: '' });
+  const [warnings, setWarnings] = useState([]); // For non-critical warnings
 
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files || []);
@@ -20,22 +22,32 @@ export default function FileUploader({ onDataParsed }) {
     const pdfFiles = files.filter(file => file.type === 'application/pdf');
     
     if (pdfFiles.length === 0) {
-      setError('Please select at least one PDF file');
+      setError({
+        severity: 'error',
+        message: 'Please select at least one PDF file',
+        suggestions: ['Ensure you\'re uploading PDF files (.pdf extension)', 'Check that the file isn\'t corrupted']
+      });
       return;
     }
 
     if (pdfFiles.length > 10) {
-      setError('Maximum 10 PDF files allowed at once');
+      setError({
+        severity: 'error',
+        message: 'Maximum 10 PDF files allowed at once',
+        suggestions: ['Split your upload into multiple batches', 'Select only the most recent statements']
+      });
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError(null);
+    setWarnings([]);
     setProgress({ current: 0, total: pdfFiles.length, fileName: '' });
 
     try {
       const allTransactions = [];
       let combinedBankType = '';
+      const fileWarnings = [];
 
       // ✅ Process each PDF file
       for (let i = 0; i < pdfFiles.length; i++) {
@@ -56,8 +68,17 @@ export default function FileUploader({ onDataParsed }) {
             fullText += pageText + ' ';
           }
 
-          // Parse the statement
+          // ✅ Parse the statement with enhanced error handling
           const transactions = parseStatement(fullText, pageCount);
+          
+          // ✅ Check for low confidence warnings
+          if (transactions.length > 0 && transactions[0].confidence < 0.8) {
+            fileWarnings.push({
+              file: file.name,
+              message: `Parsed with ${Math.round(transactions[0].confidence * 100)}% confidence - please review carefully`,
+              severity: 'warning'
+            });
+          }
           
           // ✅ Add source file info to each transaction
           const transactionsWithSource = transactions.map(t => ({
@@ -70,26 +91,48 @@ export default function FileUploader({ onDataParsed }) {
 
           // Track bank types
           if (i === 0) {
-            if (fullText.includes('Chase')) combinedBankType = 'Chase';
-            else if (fullText.includes('Monzo')) combinedBankType = 'Monzo';
-            else if (fullText.includes('Santander')) combinedBankType = 'Santander';
-            else if (fullText.includes('Barclays')) combinedBankType = 'Barclays';
-            else if (fullText.includes('Lloyds') || fullText.includes('Halifax')) combinedBankType = 'Lloyds/Halifax';
-          } else {
+            combinedBankType = transactions[0]?.parserUsed || 'Unknown';
+          } else if (transactions[0]?.parserUsed !== combinedBankType) {
             combinedBankType = 'Multiple Banks';
           }
 
-          console.log(`✅ Processed ${file.name}: ${transactions.length} transactions`);
+          console.log(`✅ Processed ${file.name}: ${transactions.length} transactions (${transactions[0]?.parserUsed || 'Unknown'})`);
 
         } catch (fileError) {
           console.error(`❌ Error processing ${file.name}:`, fileError);
-          setError(`Error in ${file.name}: ${fileError.message}. Continuing with other files...`);
-          // Continue processing other files
+          
+          // ✅ Handle ParsingError with enhanced messaging
+          if (fileError instanceof ParsingError) {
+            const formattedError = formatErrorForUI(fileError);
+            
+            if (formattedError.severity === 'error') {
+              // Critical error - stop processing
+              throw fileError;
+            } else {
+              // Warning - continue with other files
+              fileWarnings.push({
+                file: file.name,
+                message: formattedError.message,
+                suggestions: formattedError.suggestions,
+                severity: formattedError.severity
+              });
+            }
+          } else {
+            // Unknown error
+            fileWarnings.push({
+              file: file.name,
+              message: `Failed to process: ${fileError.message}`,
+              severity: 'error'
+            });
+          }
         }
       }
 
       if (allTransactions.length === 0) {
-        throw new Error('No transactions found in any of the uploaded files');
+        throw new ParsingError('NO_TRANSACTIONS_FOUND', {
+          bankType: combinedBankType,
+          filesProcessed: pdfFiles.length
+        });
       }
 
       // ✅ Sort all transactions by date (newest first)
@@ -110,30 +153,42 @@ export default function FileUploader({ onDataParsed }) {
       const duplicatesRemoved = allTransactions.length - uniqueTransactions.length;
       if (duplicatesRemoved > 0) {
         console.log(`🔄 Removed ${duplicatesRemoved} duplicate transactions`);
+        fileWarnings.push({
+          message: `Removed ${duplicatesRemoved} duplicate transactions`,
+          severity: 'info'
+        });
       }
 
       console.log(`✅ Total: ${uniqueTransactions.length} unique transactions from ${pdfFiles.length} file(s)`);
+
+      // Set warnings if any
+      if (fileWarnings.length > 0) {
+        setWarnings(fileWarnings);
+      }
 
       // Send to parent component
       onDataParsed(uniqueTransactions);
 
       setLoading(false);
-      setError('');
+      setError(null);
 
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.message || 'Failed to process files');
+      
+      // ✅ Format error for display
+      const formattedError = formatErrorForUI(err);
+      setError(formattedError);
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto">
+    <div className="w-full max-w-xl mx-auto space-y-4">
       <div className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-blue-400 transition-colors">
         <input
           type="file"
           accept="application/pdf"
-          multiple  // ✅ Enable multiple file selection
+          multiple
           onChange={handleFileUpload}
           disabled={loading}
           className="hidden"
@@ -205,11 +260,20 @@ export default function FileUploader({ onDataParsed }) {
         </label>
       </div>
 
+      {/* ✅ Enhanced Error Display */}
       {error && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start gap-2">
+        <div className={`p-4 rounded-lg border ${
+          error.severity === 'error' ? 'bg-red-50 border-red-200' :
+          error.severity === 'warning' ? 'bg-amber-50 border-amber-200' :
+          'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-start gap-3">
             <svg
-              className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
+              className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                error.severity === 'error' ? 'text-red-600' :
+                error.severity === 'warning' ? 'text-amber-600' :
+                'text-blue-600'
+              }`}
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -219,11 +283,75 @@ export default function FileUploader({ onDataParsed }) {
                 clipRule="evenodd"
               />
             </svg>
-            <div>
-              <p className="text-sm font-medium text-red-800">Upload Error</p>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${
+                error.severity === 'error' ? 'text-red-800' :
+                error.severity === 'warning' ? 'text-amber-800' :
+                'text-blue-800'
+              }`}>
+                {error.severity === 'error' ? 'Upload Error' :
+                 error.severity === 'warning' ? 'Warning' :
+                 'Information'}
+              </p>
+              <p className={`text-sm mt-1 whitespace-pre-line ${
+                error.severity === 'error' ? 'text-red-700' :
+                error.severity === 'warning' ? 'text-amber-700' :
+                'text-blue-700'
+              }`}>
+                {error.message}
+              </p>
+              
+              {/* ✅ Display Suggestions */}
+              {error.suggestions && error.suggestions.length > 0 && (
+                <div className="mt-3">
+                  <p className={`text-xs font-semibold ${
+                    error.severity === 'error' ? 'text-red-800' :
+                    error.severity === 'warning' ? 'text-amber-800' :
+                    'text-blue-800'
+                  }`}>
+                    Try this:
+                  </p>
+                  <ul className={`mt-1 space-y-1 text-xs ${
+                    error.severity === 'error' ? 'text-red-700' :
+                    error.severity === 'warning' ? 'text-amber-700' :
+                    'text-blue-700'
+                  }`}>
+                    {error.suggestions.map((suggestion, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-xs mt-0.5">•</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ✅ Warnings Display */}
+      {warnings.length > 0 && !error && (
+        <div className="space-y-2">
+          {warnings.map((warning, idx) => (
+            <div key={idx} className={`p-3 rounded-lg border text-sm ${
+              warning.severity === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' :
+              warning.severity === 'info' ? 'bg-blue-50 border-blue-200 text-blue-800' :
+              'bg-red-50 border-red-200 text-red-800'
+            }`}>
+              <div className="flex items-start gap-2">
+                <span className="font-medium">{warning.file ? `${warning.file}: ` : ''}</span>
+                <span>{warning.message}</span>
+              </div>
+              {warning.suggestions && (
+                <ul className="mt-2 ml-4 space-y-1 text-xs">
+                  {warning.suggestions.map((suggestion, sidx) => (
+                    <li key={sidx}>• {suggestion}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
