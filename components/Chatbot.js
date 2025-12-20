@@ -73,7 +73,6 @@ export default function Chatbot({ transactions }) {
           <span className="font-semibold text-sm sm:text-base whitespace-nowrap">
             Chat with an AI accountant
           </span>
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
         </button>
       )}
 
