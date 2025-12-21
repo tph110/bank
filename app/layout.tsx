@@ -1,8 +1,12 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Only Banks",
-  description: "Secure, client-side bank statement processing",
+  title: "OnlyBanks - Financial Analytics",
+  description: "AI-powered bank statement analysis for UK banks. Secure, client-side processing with Excel export.",
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({
