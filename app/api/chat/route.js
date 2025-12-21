@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { messages, transactions } = await request.body.json();
+    const { messages, transactions } = await request.json(); // ✅ Fixed!
 
     // Prepare context about the user's transactions
     const totalSpent = transactions
