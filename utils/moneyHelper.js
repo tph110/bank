@@ -1,7 +1,7 @@
 // utils/moneyHelper.js
 
-import { parseGenericStatement, calculateConfidence, validateTransactions } from './genericParser.js';
-import { ParsingError, detectPDFIssues, analyzeParsingResults } from './errorMessages.js';
+import { parseGenericStatement, calculateConfidence, validateTransactions } from './genericParser';
+import { ParsingError, detectPDFIssues, analyzeParsingResults } from './errorMessages';
 
 // Constants
 const AVG_UK_COFFEE_SPEND = 28.50;
@@ -60,14 +60,25 @@ const detectBankType = (rawText) => {
     { keywords: ['Santander', 'Sort Code'], name: 'Santander' },
     { keywords: ['Chase', 'Account number'], name: 'Chase' },
     { keywords: ['Monzo', 'monzo.com'], name: 'Monzo' },
-    { keywords: ['BARCLAYS', 'Barclays'], name: 'Barclays' },
     { keywords: ['Lloyds', 'Halifax'], name: 'Lloyds/Halifax' },
   ];
   
+  // Check standard banks (require all keywords)
   for (const check of checks) {
     if (check.keywords.every(kw => rawText.includes(kw))) {
       return check.name;
     }
+  }
+  
+  // Barclays: Check for either personal or business accounts
+  // Personal: Has "BARCLAYS" or "Barclays" in header
+  // Business: Has "Your Business Current Account" or "Business Premium Account"
+  if (rawText.includes('BARCLAYS') || 
+      rawText.includes('Barclays') ||
+      rawText.includes('Your Business Current Account') ||
+      rawText.includes('Business Premium Account') ||
+      rawText.includes('Business Savings Account')) {
+    return 'Barclays';
   }
   
   return null;
@@ -225,7 +236,16 @@ const parseBarclaysStatement = (rawText, detectedYear) => {
         .replace(/\d+\s*•\s*\d+/g, '') 
         .replace(/.*Financial Services Compensation Scheme\.?/gi, '')
         .replace(/to "Barclays Base Rate".*? \d+/gi, '')
-        .replace(/Banbury Road Medical Centre/gi, '') 
+        .replace(/Banbury Road Medical Centre/gi, '')
+        .replace(/Your Business Current Account/gi, '')
+        .replace(/Business Premium Account/gi, '')
+        .replace(/Business Savings Account/gi, '')
+        .replace(/At a glance/gi, '')
+        .replace(/THE PARTNERS/gi, '')
+        .replace(/TRADING AS/gi, '')
+        .replace(/SWIFTBIC [A-Z0-9]+/gi, '')
+        .replace(/IBAN [A-Z0-9\s]+/gi, '')
+        .replace(/Agreed limits/gi, '')
         .replace(/^\d{1,2}\s[A-Za-z]{3}/, '') 
         .replace(/Continued/gi, '')
         .replace(/^[^\w]+/, '') 
