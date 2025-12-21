@@ -1,110 +1,97 @@
-import { NextResponse } from "next/server";
+// app/api/chat/route.js
+import { NextResponse } from 'next/server';
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { message, context } = await req.json();
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const { messages, transactions } = await request.body.json();
 
-    if (!apiKey) {
-      console.error("❌ Missing API Key");
-      return NextResponse.json({ error: "Server Error: API Key missing" }, { status: 500 });
-    }
+    // Prepare context about the user's transactions
+    const totalSpent = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    console.log("📤 Sending to AI...");
+    // Group by category
+    const categorySpending = {};
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        categorySpending[t.category] = (categorySpending[t.category] || 0) + t.amount;
+      });
 
-    // ✅ Format the context nicely for the AI
-    const formattedContext = context ? `
-FINANCIAL SUMMARY (${context.dateRange}):
+    const topCategories = Object.entries(categorySpending)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => `${category}: £${amount.toFixed(2)}`)
+      .join(', ');
 
-OVERALL:
-- Total Spent: £${context.totalExpenses.toFixed(2)}
-- Total Income: £${context.totalIncome.toFixed(2)}
-- Net Balance: £${(context.totalIncome - context.totalExpenses).toFixed(2)}
-- Total Transactions: ${context.transactionCount} (${context.expenseCount} expenses, ${context.incomeCount} income)
+    // Date range
+    const dates = transactions.map(t => t.date).sort();
+    const dateRange = dates.length > 0 
+      ? `${dates[0]} to ${dates[dates.length - 1]}` 
+      : 'Unknown';
 
-SPENDING BY CATEGORY:
-${Object.entries(context.categoryBreakdown)
-  .sort((a, b) => b[1] - a[1])
-  .map(([cat, amount]) => `- ${cat}: £${amount.toFixed(2)}`)
-  .join('\n')}
+    // Build system prompt with financial context
+    const systemPrompt = `You are a helpful AI accountant assistant analyzing the user's financial data. 
 
-COFFEE & CAFE SPENDING:
-- Total on Coffee/Cafes: £${context.coffeeSpending.total.toFixed(2)}
-- Number of Coffee Purchases: ${context.coffeeSpending.count}
-${context.coffeeSpending.count > 0 ? `- Recent Coffee Transactions:\n  ${context.coffeeSpending.transactions.join('\n  ')}` : ''}
+Financial Summary:
+- Total Spent: £${totalSpent.toFixed(2)}
+- Total Income: £${totalIncome.toFixed(2)}
+- Net Balance: £${(totalIncome - totalSpent).toFixed(2)}
+- Date Range: ${dateRange}
+- Number of Transactions: ${transactions.length}
+- Top Spending Categories: ${topCategories}
 
-TOP 20 MERCHANTS:
-${context.topMerchants.join('\n')}
-` : "No transaction data available.";
+Provide helpful, concise financial advice. Focus on:
+- Spending patterns and trends
+- Savings opportunities
+- Budget recommendations
+- Category-specific insights
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
+Be friendly, professional, and practical. Keep responses under 150 words unless asked for detail.`;
+
+    // Call OpenRouter API (you can also use Anthropic API directly)
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.SITE_URL || "https://onlybanks.vercel.app/",
-        "X-Title": "OnlyBanks",
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://onlybanks.vercel.app',
+        'X-Title': 'OnlyBanks'
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-3b-instruct",
+        model: 'anthropic/claude-3.5-sonnet', // Or 'meta-llama/llama-3.2-3b-instruct:free'
         messages: [
-          {
-            role: "system",
-            content: `You are a helpful financial assistant for "OnlyBanks".
-
-Below is a summary of the user's transaction data.
-
-${formattedContext}
-
-Answer the user's question based strictly on this data.
-
-IMPORTANT INSTRUCTIONS:
-- Be specific with amounts and dates when available
-- Format all currency as GBP with £ symbol
-- Be friendly, concise, and helpful
-- When asked about coffee, cafes, or similar purchases, check the "COFFEE & CAFE SPENDING" section
-- Pret A Manger, Costa, Starbucks, Caffe Nero, Greggs coffee = all count as coffee spending
-- When asked about specific categories, use the "SPENDING BY CATEGORY" section
-- When asked about merchants or shops, use the "TOP 20 MERCHANTS" section
-- If asked about something not in the data, say you don't see that information
-- Never make up numbers or transactions`
-          },
-          { role: "user", content: message }
+          { role: 'system', content: systemPrompt },
+          ...messages
         ],
-        temperature: 0.5,
-        max_tokens: 400,
+        max_tokens: 500,
+        temperature: 0.7
       })
     });
 
-    console.log("📥 AI response status:", response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ AI Error:", errorText);
-      
-      if (response.status === 429) {
-        return NextResponse.json({ 
-          error: "The AI is busy right now. Please try again in a moment.",
-        }, { status: 429 });
-      }
-
-      return NextResponse.json({ 
-        error: `AI service error. Please try again.`,
-      }, { status: 500 });
+      const error = await response.text();
+      console.error('OpenRouter API error:', error);
+      throw new Error('Failed to get AI response');
     }
 
     const data = await response.json();
-    console.log("✅ Got AI response");
-    
-    const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response.";
-    
-    return NextResponse.json({ reply });
+    const aiMessage = data.choices[0].message.content;
+
+    return NextResponse.json({ 
+      message: aiMessage,
+      success: true 
+    });
 
   } catch (error) {
-    console.error("❌ Chat Error:", error.message);
-    
+    console.error('Chat API error:', error);
     return NextResponse.json({ 
-      error: "I'm having trouble connecting right now. Please try again.",
+      error: 'Sorry, I encountered an error. Please try again.',
+      success: false 
     }, { status: 500 });
   }
 }
