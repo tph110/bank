@@ -1,10 +1,15 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { generateInsights } from '../utils/moneyHelper';
 import { sampleTransactions } from '../utils/sampleData';
 import { exportToExcel, exportToCSV } from '../utils/excelExport';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
+
+// NEW: Import new feature utilities
+import { detectRecurringTransactions, getRecurringSummary, generateRecurringInsights } from '../utils/recurringDetector';
+import { groupByMonth, analyzeTrends, generateMultiMonthInsights } from '../utils/multiMonthAnalysis';
+import { getGoals, createGoal, updateGoal, deleteGoal, calculateCurrentSavingsRate } from '../utils/goalTracker';
 
 // Dynamic Imports
 const FileUploader = dynamic(() => import('../components/FileUploader'), {
@@ -19,6 +24,11 @@ const FileUploader = dynamic(() => import('../components/FileUploader'), {
 const Chatbot = dynamic(() => import('../components/Chatbot'), { 
   ssr: false 
 });
+
+// NEW: Import new feature components
+const RecurringTransactions = dynamic(() => import('../components/RecurringTransactions'), { ssr: false });
+const MultiMonthComparison = dynamic(() => import('../components/MultiMonthComparison'), { ssr: false });
+const GoalTracker = dynamic(() => import('../components/GoalTracker'), { ssr: false });
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c', '#d084d8', '#ff6b9d'];
 
@@ -97,6 +107,12 @@ export default function Home() {
   const [isBudgetExpanded, setIsBudgetExpanded] = useState(false);
   const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
+  // NEW: State for new features
+  const [goals, setGoals] = useState([]);
+  const [recurringTransactions, setRecurringTransactions] = useState([]);
+  const [recurringSummary, setRecurringSummary] = useState(null);
+  const [multiMonthTrends, setMultiMonthTrends] = useState(null);
+
   // ✅ Function to update transaction category
   const updateTransactionCategory = (transactionId, newCategory) => {
     setTransactions(prevTransactions =>
@@ -136,6 +152,63 @@ export default function Home() {
     await processTransactions(sampleTransactions);
     window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
   };
+
+  // NEW: Load goals from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const loadedGoals = getGoals();
+      setGoals(loadedGoals);
+    }
+  }, []);
+
+  // NEW: Analyze transactions for new features
+  useEffect(() => {
+    if (transactions.length === 0) return;
+
+    // 1. Detect recurring transactions
+    const recurring = detectRecurringTransactions(transactions);
+    const summary = getRecurringSummary(recurring);
+    setRecurringTransactions(recurring);
+    setRecurringSummary(summary);
+
+    // 2. Analyze multi-month trends
+    const monthlyData = groupByMonth(transactions);
+    const trends = analyzeTrends(monthlyData);
+    setMultiMonthTrends(trends);
+
+  }, [transactions]);
+
+  // NEW: Handle goal changes (create, update, delete)
+  const handleGoalChange = (action, goalIdOrData, updates) => {
+    let updatedGoals;
+    
+    switch (action) {
+      case 'create':
+        const newGoal = createGoal(goalIdOrData);
+        updatedGoals = [...goals, newGoal];
+        break;
+        
+      case 'update':
+        updateGoal(goalIdOrData, updates);
+        updatedGoals = getGoals();
+        break;
+        
+      case 'delete':
+        deleteGoal(goalIdOrData);
+        updatedGoals = getGoals();
+        break;
+        
+      default:
+        return;
+    }
+    
+    setGoals(updatedGoals);
+  };
+
+  // NEW: Calculate current savings rate for goal tracking
+  const currentSavingsRate = transactions.length > 0 
+    ? calculateCurrentSavingsRate(transactions, 1) 
+    : null;
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -436,6 +509,30 @@ export default function Home() {
                 )}
               </div>
             </div>
+
+            {/* NEW: Goal Tracker - Always shows, prompts user to create goals */}
+            <GoalTracker
+              goals={goals}
+              onGoalsChange={handleGoalChange}
+              transactions={transactions}
+              currentSavingsRate={currentSavingsRate}
+            />
+
+            {/* NEW: Recurring Transactions - Shows when recurring payments detected */}
+            {recurringSummary && recurringTransactions.length > 0 && (
+              <RecurringTransactions
+                recurringTransactions={recurringTransactions}
+                summary={recurringSummary}
+              />
+            )}
+
+            {/* NEW: Multi-Month Comparison - Shows when 2+ months uploaded */}
+            {multiMonthTrends && multiMonthTrends.trend !== 'insufficient-data' && (
+              <MultiMonthComparison
+                trends={multiMonthTrends}
+                monthlyData={groupByMonth(transactions)}
+              />
+            )}
 
             {/* Filters */}
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
