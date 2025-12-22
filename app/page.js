@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
@@ -29,6 +30,7 @@ const Chatbot = dynamic(() => import('../components/Chatbot'), {
 const RecurringTransactions = dynamic(() => import('../components/RecurringTransactions'), { ssr: false });
 const MultiMonthComparison = dynamic(() => import('../components/MultiMonthComparison'), { ssr: false });
 const GoalTracker = dynamic(() => import('../components/GoalTracker'), { ssr: false });
+const PrivacyDashboard = dynamic(() => import('../components/PrivacyDashboard'), { ssr: false });
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658', '#82ca9d', '#a4de6c', '#d084d8', '#ff6b9d'];
 
@@ -112,6 +114,7 @@ export default function Home() {
   const [recurringTransactions, setRecurringTransactions] = useState([]);
   const [recurringSummary, setRecurringSummary] = useState(null);
   const [multiMonthTrends, setMultiMonthTrends] = useState(null);
+  const [showPrivacyDashboard, setShowPrivacyDashboard] = useState(false);
 
   // ✅ Function to update transaction category
   const updateTransactionCategory = (transactionId, newCategory) => {
@@ -319,30 +322,45 @@ export default function Home() {
               Only<span className="text-blue-600">Banks</span>
             </h1>
           </a>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="group relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label="Reset application"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              strokeWidth={2} 
-              stroke="currentColor" 
-              className="w-5 h-5 text-slate-500 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300"
+          <div className="flex items-center gap-2">
+            {/* Privacy Button */}
+            <button
+              onClick={() => setShowPrivacyDashboard(true)}
+              className="group relative flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Privacy & Data Control"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
-              />
-            </svg>
-            {/* Tooltip */}
-            <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Reset
-            </span>
-          </button>
+              <svg className="w-5 h-5 text-slate-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="hidden sm:inline text-sm font-medium text-slate-700 group-hover:text-blue-600">Privacy</span>
+            </button>
+            
+            {/* Reset Button */}
+            <button 
+              onClick={() => window.location.reload()} 
+              className="group relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              aria-label="Reset application"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth={2} 
+                stroke="currentColor" 
+                className="w-5 h-5 text-slate-500 group-hover:text-blue-600 group-hover:rotate-180 transition-all duration-300"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
+                />
+              </svg>
+              {/* Tooltip */}
+              <span className="absolute right-0 top-full mt-2 px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Reset
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -795,6 +813,11 @@ export default function Home() {
 
       {/* AI Chatbot */}
       {transactions.length > 0 && <Chatbot transactions={transactions} />}
+      
+      {/* Privacy Dashboard Modal */}
+      {showPrivacyDashboard && (
+        <PrivacyDashboard onClose={() => setShowPrivacyDashboard(false)} />
+      )}
     </main>
   );
 }
