@@ -82,9 +82,31 @@ export default function PrivacyDashboard({ onClose }) {
               <div>
                 <h3 className="font-bold text-green-900">Your Data is Private</h3>
                 <p className="text-sm text-green-700 mt-1">
-                  All processing happens in your browser. Nothing is sent to our servers.
-                  Your bank statements are never uploaded or stored online.
+                  PDF processing happens in your browser. Bank statements never leave your device.
+                  Your transaction data is processed locally.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Features Disclosure */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🤖</span>
+              <div>
+                <h3 className="font-bold text-blue-900">AI-Powered Features</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Our AI insights and chatbot use OpenRouter API to process transaction data in real-time.
+                  Data is <strong>not stored</strong> by the AI provider. Transmission is encrypted via HTTPS.
+                </p>
+                <details className="mt-2 text-xs text-blue-600">
+                  <summary className="cursor-pointer font-medium hover:text-blue-800">What's sent to AI?</summary>
+                  <ul className="mt-2 space-y-1 ml-4">
+                    <li>• Insights: Summary data only (totals, categories, date range)</li>
+                    <li>• Chatbot: Full transaction list (to answer your questions accurately)</li>
+                    <li>• Never sent: Bank PDFs, account numbers, personal names</li>
+                  </ul>
+                </details>
               </div>
             </div>
           </div>
@@ -200,7 +222,7 @@ export default function PrivacyDashboard({ onClose }) {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 mt-0.5">✓</span>
-                <span><strong>Transaction Data:</strong> Not stored between sessions</span>
+                <span><strong>Transaction Data:</strong> Not stored between sessions (memory only)</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 mt-0.5">✓</span>
@@ -208,7 +230,11 @@ export default function PrivacyDashboard({ onClose }) {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 mt-0.5">✓</span>
-                <span><strong>Server Storage:</strong> Nothing sent to or stored on our servers</span>
+                <span><strong>Server Storage:</strong> No database, no logs, no persistent storage</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-600 mt-0.5">✓</span>
+                <span><strong>AI Provider:</strong> OpenRouter doesn't log or store your data (per their policy)</span>
               </li>
             </ul>
           </div>
